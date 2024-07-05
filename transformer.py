@@ -1,8 +1,18 @@
-# Large Language Model v0.11 *Experimental*
+# Large Language Model v0.12 *Experimental*
 
 import numpy as np
 import random
 import pickle
+
+descale_factor = 0.1 # h_next_descale_factor
+generate_len = 100
+dictionary_memory_uncompressed = 1580 #Use -1 for large scale training
+hidden_size = 1740 # adjust weights appropriately
+epochs = 150 # no available metrics for suitable epoch count
+compendium_filename = f"Compendium#{random.randint(0, 10000000)}.txt"
+file = "test.txt"
+# Define file names for saving and loading word_dict
+word_dict_file = "word_dict.dat"
 
 stop_words = [
     "a", "about", "above", "after", "again", "against", "all", "am", "an", "and", "any", "are", "aren't", "as", "at",
@@ -25,29 +35,11 @@ stop_words = [
     "you", "you'd", "you'll", "you're", "you've", "your", "yours", "yourself", "yourselves"
 ]
 
-descale_factor = 0.1 # h_next_descale_factor
-generate_len = 100
-dictionary_memory_uncompressed = 1580 #Use -1 for large scale training
-hidden_size = 1740 # adjust weights appropriately
-epochs = 50 # no available metrics for suitable epoch count
-compendium_filename = f"Compendium#{random.randint(0, 10000000)}.txt"
-file = "test.txt"
-# Define file names for saving and loading word_dict
-word_dict_file = "word_dict.dat"
-
 class RNN:
     def __init__(self, input_size, hidden_size, output_size, learning_rate=0.01):
         self.input_size = input_size
         self.hidden_size = hidden_size
         self.output_size = output_size
-        self.learning_rate = learning_rate
-
-        # Initialize weights and biases for the neural network
-        self.W_xh = np.random.randn(hidden_size, input_size) * 0.01
-        self.W_hh = np.random.randn(hidden_size, hidden_size) * 0.01
-        self.W_hy = np.random.randn(output_size, hidden_size) * 0.01
-        self.b_h = np.zeros((hidden_size, 1))
-        self.b_y = np.zeros((output_size, 1))
 
     def forward(self, inputs, h_prev):
         seq_len = inputs.shape[1]
