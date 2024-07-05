@@ -1,38 +1,17 @@
-# Large Language Model v0.13 *Experimental*
+# Large Language Model v0.14 *Experimental*
 
 import numpy as np
 import random
 import pickle
 
 generate_len = 100
-dictionary_memory_uncompressed = 1580 #Use -1 for large scale training
-hidden_size = 1740 # adjust weights appropriately
-epochs = 50 # no available metrics for suitable epoch count
+dictionary_memory_uncompressed = 1580  # Use -1 for large scale training
+hidden_size = 1740  # adjust weights appropriately
+epochs = 50  # no available metrics for suitable epoch count
 compendium_filename = f"Compendium#{random.randint(0, 10000000)}.txt"
 file = "test.txt"
 # Define file names for saving and loading word_dict
 word_dict_file = "word_dict.dat"
-
-stop_words = [
-    "a", "about", "above", "after", "again", "against", "all", "am", "an", "and", "any", "are", "aren't", "as", "at",
-    "be", "because", "been", "before", "being", "below", "between", "both", "but", "by",
-    "can't", "cannot", "could", "couldn't",
-    "did", "didn't", "do", "does", "doesn't", "doing", "don't", "down", "during",
-    "each",
-    "few", "for", "from", "further",
-    "had", "hadn't", "has", "hasn't", "have", "haven't", "having", "he", "he'd", "he'll", "he's", "her", "here", "here's", "hers", "herself", "him", "himself", "his", "how", "how's",
-    "i", "i'd", "i'll", "i'm", "i've", "if", "in", "into", "is", "isn't", "it", "it's", "its", "itself",
-    "let's",
-    "me", "more", "most", "mustn't", "my", "myself",
-    "no", "nor", "not",
-    "of", "off", "on", "once", "only", "or", "other", "ought", "our", "ours", "ourselves", "out", "over", "own",
-    "same", "shan't", "she", "she'd", "she'll", "she's", "should", "shouldn't", "so", "some", "such",
-    "than", "that", "that's", "the", "their", "theirs", "them", "themselves", "then", "there", "there's", "these", "they", "they'd", "they'll", "they're", "they've", "this", "those", "through", "to", "too",
-    "under", "until", "up",
-    "very",
-    "was", "wasn't", "we", "we'd", "we'll", "we're", "we've", "were", "weren't", "what", "what's", "when", "when's", "where", "where's", "which", "while", "who", "who's", "whom", "why", "why's", "with", "won't", "would", "wouldn't",
-    "you", "you'd", "you'll", "you're", "you've", "your", "yours", "yourself", "yourselves"
-]
 
 class RNN:
     def __init__(self, input_size, hidden_size, output_size, learning_rate=0.01):
@@ -48,18 +27,23 @@ class RNN:
         self.b_h = np.zeros((hidden_size, 1))
         self.b_y = np.zeros((output_size, 1))
 
-    def forward(self, inputs, h_prev):
+    def forward(self, inputs, h_prev, word_dict):
         seq_len = inputs.shape[1]
         h_next = h_prev
-        outputs = np.zeros((self.output_size, seq_len))
+        outputs = inputs
 
         for t in range(seq_len):
             x_t = inputs[:, t].reshape(-1, 1)
-            h_next = np.tanh(np.dot(self.W_xh, x_t)) + np.dot(self.W_hh, h_prev) + self.b_h
+            h_next = np.tanh(np.dot(self.W_xh, x_t) + np.dot(self.W_hh, h_prev) + self.b_h)
             y_t = np.dot(self.W_hy, h_next) + self.b_y
             outputs[:, t] = y_t.squeeze()
             h_prev = h_next
-        return outputs, h_next
+
+            # Reorder word_dict based on the output probabilities
+            sorted_indices = np.argsort(outputs[:, t])[::-1]  # Sort in descending order
+            word_dict[:] = [word_dict[i+t] for i in sorted_indices]
+
+        return outputs, h_next, word_dict
 
 def softmax(x):
     """Compute softmax function."""
@@ -87,32 +71,28 @@ def find_word_index(word_dict, input_word):
 
 def generate_text_rnn(rnn, user_input, word_dict, length_to_generate):
     # Generate text using the RNN model
-    generated_text = user_input
+    generated_text = user_input[:]
     h_prev = np.zeros((hidden_size, 1))
     input_vector = np.zeros((len(word_dict), 1))
 
-    for word in ' '.join(generated_text).split():
-        # Get the index of the input word in the list of unique words
+    for word in generated_text:
         input_indexes = find_word_index(word_dict, word)
         for input_index in input_indexes:
             input_vector[input_index] = 1
-    for _ in range(generate_len):
+
+    for _ in range(length_to_generate):
         # Forward pass
-        output, h_prev = rnn.forward(input_vector, h_prev)
-        # Apply temperature scaling to the output probabilities
+        output, h_prev, word_dict = rnn.forward(input_vector, h_prev, word_dict)
         adjusted_probabilities = softmax(output.flatten())
-        # Sample the next word index
-        adjusted_probabilities[np.isnan(adjusted_probabilities)] = 0.1
-        normalized_probabilities = adjusted_probabilities / np.sum(adjusted_probabilities)
+        next_index = np.random.choice(len(adjusted_probabilities), p=adjusted_probabilities)
 
-        next_index = np.random.choice(len(normalized_probabilities), p=normalized_probabilities)
-
-        # Get the next word from the unique_words list
+        # Get the next word from the reordered word_dict
         next_word = word_dict[next_index]
-        if any(next_word.find(p) != -1 for p in stop_words):  # Check if next_word ends with punctuation
-            input_vector = np.zeros((len(word_dict), 1))
-        input_vector[next_index] = 1
         generated_text.append(next_word)
+
+        # Prepare the input vector for the next step
+        input_vector = np.zeros((len(word_dict), 1))
+        input_vector[next_index] = 1
 
     return ' '.join(generated_text)
 
@@ -143,8 +123,11 @@ def main():
         input_size = len(word_dict)
         output_size = len(word_dict)
 
+        # Find stop word indices
+        stop_word_indices = find_stop_word_indices(word_dict, stop_words)
+
         # Initialize RNN
-        rnn = RNN(input_size, hidden_size, output_size)
+        rnn = RNN(input_size, hidden_size, output_size, stop_word_indices)
 
     # If word_dict doesn't exist or if user chooses to generate a new one
     if word_dict is None or _choice_ == "s":
