@@ -1,12 +1,12 @@
-# Large Language Model v0.14 *Experimental*
+# Large Language Model v0.15 *Experimental*
 
 import numpy as np
 import random
 import pickle
 
 generate_len = 100
-dictionary_memory_uncompressed = 1580  # Use -1 for large scale training
-hidden_size = 1740  # adjust weights appropriately
+dictionary_memory_uncompressed = 580  # Use -1 for large scale training
+hidden_size = 740  # adjust weights appropriately
 epochs = 50  # no available metrics for suitable epoch count
 compendium_filename = f"Compendium#{random.randint(0, 10000000)}.txt"
 file = "test.txt"
@@ -30,20 +30,21 @@ class RNN:
     def forward(self, inputs, h_prev, word_dict):
         seq_len = inputs.shape[1]
         h_next = h_prev
-        outputs = inputs
+        outputs = np.zeros((self.output_size, seq_len))
 
         for t in range(seq_len):
             x_t = inputs[:, t].reshape(-1, 1)
-            h_next = np.tanh(np.dot(self.W_xh, x_t) + np.dot(self.W_hh, h_prev) + self.b_h)
+            h_next = np.dot(self.W_xh, x_t) + np.dot(self.W_hh, h_prev) + self.b_h
             y_t = np.dot(self.W_hy, h_next) + self.b_y
             outputs[:, t] = y_t.squeeze()
             h_prev = h_next
 
             # Reorder word_dict based on the output probabilities
             sorted_indices = np.argsort(outputs[:, t])[::-1]  # Sort in descending order
-            word_dict[:] = [word_dict[i+t] for i in sorted_indices]
+            word_dict = [word_dict[i] for i in sorted_indices]
 
         return outputs, h_next, word_dict
+
 
 def softmax(x):
     """Compute softmax function."""
@@ -57,6 +58,7 @@ def preprocess_text(text, n=3):
     for ngram in sentence_ngrams:
         ngram_str = ' '.join(ngram)
         ngrams.append(ngram_str)
+        ngrams.append(ngram_str.split()[1])
     return list(ngrams)
 
 def find_word_index(word_dict, input_word):
@@ -68,7 +70,6 @@ def find_word_index(word_dict, input_word):
         except:
             False
     return results
-
 def generate_text_rnn(rnn, user_input, word_dict, length_to_generate):
     # Generate text using the RNN model
     generated_text = user_input[:]
@@ -95,6 +96,8 @@ def generate_text_rnn(rnn, user_input, word_dict, length_to_generate):
         input_vector[next_index] = 1
 
     return ' '.join(generated_text)
+
+
 
 # Function to save word_dict to a file
 def save_word_dict(word_dict, filename):
