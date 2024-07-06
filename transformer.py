@@ -1,4 +1,4 @@
-# Large Language Model v0.15 *Experimental*
+# Large Language Model v0.16 *Experimental*
 
 import numpy as np
 import random
@@ -85,7 +85,9 @@ def generate_text_rnn(rnn, user_input, word_dict, length_to_generate):
         # Forward pass
         output, h_prev, word_dict = rnn.forward(input_vector, h_prev, word_dict)
         adjusted_probabilities = softmax(output.flatten())
-        next_index = np.random.choice(len(adjusted_probabilities), p=adjusted_probabilities)
+
+        rng = np.random.default_rng()
+        next_index = np.random.choice(rng.permutation(len(adjusted_probabilities)), p=adjusted_probabilities)
 
         # Get the next word from the reordered word_dict
         next_word = word_dict[next_index]
@@ -126,11 +128,8 @@ def main():
         input_size = len(word_dict)
         output_size = len(word_dict)
 
-        # Find stop word indices
-        stop_word_indices = find_stop_word_indices(word_dict, stop_words)
-
         # Initialize RNN
-        rnn = RNN(input_size, hidden_size, output_size, stop_word_indices)
+        rnn = RNN(input_size, hidden_size, output_size)
 
     # If word_dict doesn't exist or if user chooses to generate a new one
     if word_dict is None or _choice_ == "s":
