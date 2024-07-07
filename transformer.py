@@ -1,5 +1,4 @@
-# Large Language Model v0.17 *Experimental*
-
+# Large Language Model v0.18 *Experimental*
 import numpy as np
 import random
 import pickle
@@ -7,15 +6,11 @@ import pickle
 # Constants
 generate_len = 100
 dictionary_memory_uncompressed = 580
-hidden_size = 580
+hidden_size = 1740
 epochs = 50
 compendium_filename = f"Compendium#{random.randint(0, 10000000)}.txt"
 file = "test.txt"
 word_dict_file = "word_dict.dat"
-
-M0 = 1.0  # Initial memory accuracy
-T = 5     # Time point for initial rapid decline
-alpha = 0.1  # Rate constant for slower decay
 
 class RNN:
     def __init__(self, input_size, hidden_size, output_size, learning_rate=0.01):
@@ -29,17 +24,19 @@ class RNN:
         self.b_h = np.zeros((hidden_size, 1))
         self.b_y = np.zeros((output_size, 1))
 
-    def forward(self, inputs, h_prev, word_dict):
+    def forward(self, inputs, h_prev):
         seq_len = inputs.shape[1]
         h_next = h_prev
+
+        # Calculate memory accuracy for each time step
         outputs = np.zeros((self.output_size, seq_len))
         for t in range(seq_len):
             x_t = inputs[:, t].reshape(-1, 1)
-            h_next = np.tanh(np.dot(self.W_xh, x_t) + np.dot(self.W_hh, h_prev) + self.b_h)
-            y_t = np.dot(self.W_hy, h_next) + self.b_y
-            outputs[:, t] = y_t.squeeze()
+            h_next = np.tanh(np.dot(self.W_xh, x_t) + np.dot(self.W_hh, h_next) + self.b_h)
+            y_t = np.dot(self.W_hy, h_prev) + self.b_y
+            outputs[:, t] =  y_t.squeeze()
             h_prev = h_next
-        return outputs, h_next, word_dict
+        return outputs, h_next
 
 def softmax(x):
     e_x = np.exp(x - np.max(x))
@@ -64,11 +61,6 @@ def find_word_index(word_dict, input_word):
             pass
     return results
 
-def piecewise_memory_decay(t, M0, T, alpha):
-    if t < T:
-        return M0 * (1 - t / T)
-    else:
-        return M0 * np.exp(-alpha * (t - T))
 
 def generate_text_rnn(rnn, user_input, word_dict, length_to_generate):
     # Generate text using the RNN model
@@ -82,13 +74,11 @@ def generate_text_rnn(rnn, user_input, word_dict, length_to_generate):
         for input_index in input_indexes:
             input_vector[input_index] = 1
 
-    for t in range(length_to_generate):
-        # Apply memory decay model
-        memory_accuracy = piecewise_memory_decay(t, M0, T, alpha)
 
-        # Forward pass
-        outputs, h_next, word_dict = rnn.forward(input_vector, h_prev, word_dict)
-        adjusted_probabilities = softmax(outputs.flatten() * memory_accuracy)
+    for t in range(length_to_generate):
+        # Forward pass with memory accuracy
+        outputs, h_next = rnn.forward(input_vector, h_prev)
+        adjusted_probabilities = softmax(outputs.flatten())
 
         rng = np.random.default_rng()
         next_index = rng.choice(len(adjusted_probabilities), p=adjusted_probabilities)
@@ -98,9 +88,8 @@ def generate_text_rnn(rnn, user_input, word_dict, length_to_generate):
         generated_text.append(next_word)
 
         # Prepare the input vector for the next step
-        input_vector = np.zeros((len(word_dict), 1))
         input_vector[next_index] = 1
-
+        h_prev = h_next
     return ' '.join(generated_text)
 
 # Function to save word_dict to a file
