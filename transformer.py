@@ -1,4 +1,4 @@
-# Large Language Model v0.181 *Experimental*
+# Large Language Model v0.2 *Experimental*
 import numpy as np
 import random
 import pickle
@@ -6,11 +6,12 @@ import pickle
 # Constants
 generate_len = 100
 dictionary_memory_uncompressed = 580
-hidden_size = 1740
-epochs = 50
+hidden_size = 740
+epochs = 5
 compendium_filename = f"Compendium#{random.randint(0, 10000000)}.txt"
 file = "test.txt"
 word_dict_file = "word_dict.dat"
+model_file = "model.dat"
 
 class RNN:
     def __init__(self, input_size, hidden_size, output_size, learning_rate=0.01):
@@ -23,6 +24,36 @@ class RNN:
         self.W_hy = np.random.randn(output_size, hidden_size) * 0.01
         self.b_h = np.zeros((hidden_size, 1))
         self.b_y = np.zeros((output_size, 1))
+
+    def save_model(self, filename):
+        model_params = {
+            'W_xh': self.W_xh,
+            'W_hh': self.W_hh,
+            'W_hy': self.W_hy,
+            'b_h': self.b_h,
+            'b_y': self.b_y,
+            'input_size': self.input_size,
+            'hidden_size': self.hidden_size,
+            'output_size': self.output_size,
+            'learning_rate': self.learning_rate
+        }
+        with open(filename, 'wb') as f:
+            pickle.dump(model_params, f)
+        print(f"Model saved to {filename}")
+
+    def load_model(self, filename):
+        with open(filename, 'rb') as f:
+            model_params = pickle.load(f)
+        self.W_xh = model_params['W_xh']
+        self.W_hh = model_params['W_hh']
+        self.W_hy = model_params['W_hy']
+        self.b_h = model_params['b_h']
+        self.b_y = model_params['b_y']
+        self.input_size = model_params['input_size']
+        self.hidden_size = model_params['hidden_size']
+        self.output_size = model_params['output_size']
+        self.learning_rate = model_params['learning_rate']
+        print(f"Model loaded from {filename}")
 
     def forward(self, inputs, h_prev):
         seq_len = inputs.shape[1]
@@ -37,6 +68,44 @@ class RNN:
             outputs[:, t] =  y_t.squeeze()
             h_prev = h_next
         return outputs, h_next
+
+    def backward(self, inputs, targets, h_prev, outputs):
+        dW_xh, dW_hh, dW_hy = np.zeros_like(self.W_xh), np.zeros_like(self.W_hh), np.zeros_like(self.W_hy)
+        db_h, db_y = np.zeros_like(self.b_h), np.zeros_like(self.b_y)
+        dh_next = np.zeros_like(h_prev)
+
+        for t in reversed(range(len(inputs[0]))):
+            dy = outputs[:, t].reshape(-1, 1) - targets[:, t].reshape(-1, 1)
+            dW_hy += np.dot(dy, h_prev.T)
+            db_y += dy
+
+            dh = np.dot(self.W_hy.T, dy) + dh_next
+            dh_raw = (1 - h_prev ** 2) * dh
+            db_h += dh_raw
+            dW_xh += np.dot(dh_raw, inputs[:, t].reshape(1, -1))
+            dW_hh += np.dot(dh_raw, h_prev.T)
+            dh_next = np.dot(self.W_hh.T, dh_raw)
+
+        for dparam in [dW_xh, dW_hh, dW_hy, db_h, db_y]:
+            np.clip(dparam, -5, 5, out=dparam)
+
+        self.W_xh -= self.learning_rate * dW_xh
+        self.W_hh -= self.learning_rate * dW_hh
+        self.W_hy -= self.learning_rate * dW_hy
+        self.b_h -= self.learning_rate * db_h
+        self.b_y -= self.learning_rate * db_y
+
+
+    def train(self, inputs, targets, epochs=50):
+        for epoch in range(epochs):
+            h_prev = np.zeros((self.hidden_size, 1))
+            outputs, h_states = self.forward(inputs, h_prev)
+            self.backward(inputs, targets, h_states, outputs)
+            print(f'Epoch {epoch+1}/{epochs}')
+
+    def calculate_loss(self, outputs, targets):
+        loss = np.sum((outputs - targets) ** 2) / 2
+        return loss
 
 def softmax(x):
     e_x = np.exp(x - np.max(x))
@@ -106,17 +175,18 @@ def load_word_dict(filename):
 def main():
     word_dict = None
     _choice_ = input("\nSave new model/Load old model?[s/l]:").lower()
+    rnn = None
     if (_choice_ == "l"):
         try:
             word_dict = load_word_dict(word_dict_file)
+            input_size = len(word_dict)
+            output_size = len(word_dict)
+            rnn = RNN(input_size, hidden_size, output_size)
+            rnn.load_model(model_file)
         except FileNotFoundError:
             word_dict = None
 
-        input_size = len(word_dict)
-        output_size = len(word_dict)
-        rnn = RNN(input_size, hidden_size, output_size)
-
-    if word_dict is None or _choice_ == "s":
+    if (word_dict is None or _choice_ == "s"):
         with open(file, encoding="UTF-8") as f:
             text = f.read()
         print("Learning from:", file)
@@ -127,6 +197,17 @@ def main():
         output_size = len(word_dict)
         rnn = RNN(input_size, hidden_size, output_size)
         h_prev = np.zeros((hidden_size, 1))
+
+        inputs = np.zeros((input_size, len(word_dict)))
+        targets = np.zeros((output_size, len(word_dict)))
+        for i, word in enumerate(word_dict):
+            input_indexes = find_word_index(word_dict, word)
+            for input_index in input_indexes:
+                inputs[input_index, i] = 1
+            targets[:, i] = np.roll(inputs[:, i], -1)
+
+        rnn.train(inputs, targets, epochs)
+        rnn.save_model(model_file)
 
     while True:
         u_input = input("USER: ").strip().lower().split()
