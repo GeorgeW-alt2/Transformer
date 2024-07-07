@@ -1,13 +1,15 @@
-# Large Language Model v0.2 *Experimental*
+# Large Language Model v0.3 *Experimental*
+
 import numpy as np
 import random
 import pickle
 
 # Constants
 generate_len = 100
-dictionary_memory_uncompressed = 580
-hidden_size = 740
+dictionary_memory_uncompressed = 180
+hidden_size = 440
 epochs = 5
+
 compendium_filename = f"Compendium#{random.randint(0, 10000000)}.txt"
 file = "test.txt"
 word_dict_file = "word_dict.dat"
@@ -95,8 +97,8 @@ class RNN:
         self.b_h -= self.learning_rate * db_h
         self.b_y -= self.learning_rate * db_y
 
-
-    def train(self, inputs, targets, epochs=50):
+    def train(self, inputs, targets, epochs):
+        print("Training started:")
         for epoch in range(epochs):
             h_prev = np.zeros((self.hidden_size, 1))
             outputs, h_states = self.forward(inputs, h_prev)
@@ -205,6 +207,9 @@ def main():
             for input_index in input_indexes:
                 inputs[input_index, i] = 1
             targets[:, i] = np.roll(inputs[:, i], -1)
+            if i % 1000 == 0:
+                print(f'Dictionary learning progress: {i}/{len(word_dict)}')
+        print(f'Dictionary learning progress: {len(word_dict)}/{len(word_dict)}, complete!')
 
         rnn.train(inputs, targets, epochs)
         rnn.save_model(model_file)
