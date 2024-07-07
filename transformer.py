@@ -1,4 +1,4 @@
-# Large Language Model v0.18 *Experimental*
+# Large Language Model v0.181 *Experimental*
 import numpy as np
 import random
 import pickle
@@ -61,7 +61,6 @@ def find_word_index(word_dict, input_word):
             pass
     return results
 
-
 def generate_text_rnn(rnn, user_input, word_dict, length_to_generate):
     # Generate text using the RNN model
     generated_text = user_input[:]
@@ -73,7 +72,6 @@ def generate_text_rnn(rnn, user_input, word_dict, length_to_generate):
         input_indexes = find_word_index(word_dict, word)
         for input_index in input_indexes:
             input_vector[input_index] = 1
-
 
     for t in range(length_to_generate):
         # Forward pass with memory accuracy
