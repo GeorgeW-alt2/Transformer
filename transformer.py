@@ -1,12 +1,12 @@
-# Large Language Model v0.71 *Experimental*
+# Large Language Model v0.8 *Experimental*
 import numpy as np
 from collections import defaultdict
 import math
 import pickle
 
 # Model parameters
-hidden_size = 360 #last model saved requirement
-dictionary_memory_uncompressed = 380 # KB access
+hidden_size = 160 #last model saved requirement
+dictionary_memory_uncompressed = 180 # KB access
 learning_rate = 0.1
 epochs = 15
 generate_length = 100
@@ -20,38 +20,13 @@ def create_ngrams(text, n):
     ngrams = zip(*[words[i:] for i in range(n)])
     return [' '.join(ngram) for ngram in ngrams]
 
-# Function to calculate PMI
-def calculate_pmi(word1, word2, word_to_idx, co_occurrence_matrix, total_words):
-    if word1 not in word_to_idx or word2 not in word_to_idx:
-        return 0.0  # Return 0 if either word is not in the vocabulary
-
-    idx1 = word_to_idx[word1]
-    idx2 = word_to_idx[word2]
-
-    # Retrieve co-occurrence count from matrix
-    co_occurrences = co_occurrence_matrix[idx1, idx2]
-
-    # Calculate probabilities
-    prob_word1 = sum(co_occurrence_matrix[idx1, :]) / total_words
-    prob_word2 = sum(co_occurrence_matrix[idx2, :]) / total_words
-    prob_co_occurrence = co_occurrences / total_words
-
-    # Avoid division by zero or negative logarithms
-    if prob_word1 == 0 or prob_word2 == 0 or prob_co_occurrence == 0:
-        return 0.0
-
-    # Calculate PMI
-    pmi = math.log(prob_co_occurrence / (prob_word1 * prob_word2))
-
-    return pmi
-
 # Encoding function with <unk> token handling and PMI inclusion
-def encode_sentence(sentence, word_to_idx, n, vocab_pmi):
+def encode_sentence(sentence, word_to_idx, n):
     encoded = np.zeros(vocab_size)
     ngrams = create_ngrams(sentence, n)
     for ngram in ngrams:
         if ngram in word_to_idx:
-            encoded[word_to_idx[ngram]-1] = vocab_pmi.get(ngram, 1.0)  # Use PMI value or default to 1.0 if not found
+            encoded[word_to_idx[ngram]-1] = 1.0 # Use PMI value or default to 1.0 if not found
         else:
             encoded[word_to_idx[padding_token]-1] = 0  # Assign 1.0 for <unk> token if n-gram is unknown
     return encoded
@@ -155,7 +130,7 @@ def roll_encoded_sentence(encoded_sentence):
     return np.roll(encoded_sentence, 1)
 
 def chat(model, question, generate_length, n):
-    input_seq = encode_sentence(question, word_to_idx, n, vocab_pmi).reshape(1, -1)
+    input_seq = encode_sentence(question, word_to_idx, n).reshape(1, -1)
     output = []
 
     for i in range(generate_length):
@@ -176,7 +151,7 @@ def chat(model, question, generate_length, n):
 
         last_ngram = output[-1].split()[-(n-1):]
         new_ngram = ' '.join(last_ngram + [idx_to_word[predicted_idx + 1]])  # Adjust index to start from 0
-        input_seq = encode_sentence(new_ngram, word_to_idx, n, vocab_pmi).reshape(1, -1)
+        input_seq = encode_sentence(new_ngram, word_to_idx, n).reshape(1, -1)
 
     return ' '.join(output)
 
@@ -196,7 +171,6 @@ _choice_ = input("\nSave new model/Load old model?[s/l]:").lower()
 
 word_to_idx = {}
 idx_to_word = {}
-vocab_pmi = {}
 if (_choice_ == "s"):
     # Load and preprocess data
     with open("test.txt", encoding="UTF-8") as f:
@@ -204,18 +178,14 @@ if (_choice_ == "s"):
 
     # Vocabulary creation including PMI values
 
-  # Choose the n-gram size
+    # Choose the n-gram size
     vocab = set()
 
     for conv in conversations:
         ngrams = create_ngrams(conv, n)
         for ngram in ngrams:
-            if ngram not in vocab:
-                vocab.add(ngram)
-                if len(ngram.split()) == 2:  # Example for bigrams, adjust for your n-gram size
-                    word_indices = [word_to_idx[word] for word in ngram.split()]
-                    pmi = calculate_pmi(word_indices[0], word_indices[1], word_to_idx)
-                    vocab_pmi[ngram] = pmi
+            vocab.add(ngram)
+
 
     # Add a special token for unknown words
     vocab.add(padding_token)
@@ -225,7 +195,6 @@ if (_choice_ == "s"):
     idx_to_word = {idx: word for word, idx in word_to_idx.items()}
     save_word_dict(word_to_idx, "langA.dat")
     save_word_dict(idx_to_word, "langB.dat")
-    save_word_dict(vocab_pmi, "PMI_data.dat")
 
     vocab_size = len(vocab)
     output_size = vocab_size
@@ -237,8 +206,8 @@ if (_choice_ == "s"):
     for epoch in range(epochs):
         total_loss = 0
         for conv in conversations:
-            input_seq = encode_sentence(conv, word_to_idx, n, vocab_pmi)
-            target_seq = roll_encoded_sentence(encode_sentence(conv, word_to_idx, n, vocab_pmi))
+            input_seq = encode_sentence(conv, word_to_idx, n)
+            target_seq = roll_encoded_sentence(encode_sentence(conv, word_to_idx, n))
 
             model.train(input_seq.reshape(1, -1), target_seq.reshape(1, -1))
             total_loss += np.sum((model.forward(input_seq.reshape(1, -1)) - target_seq)**2)
@@ -251,7 +220,6 @@ if (_choice_ == "s"):
 if (_choice_ == "l"):
     word_to_idx = load_word_dict("langA.dat")
     idx_to_word = load_word_dict( "langB.dat")
-    vocab_pmi = load_word_dict("PMI_data.dat")
     input_size = len(word_to_idx)
     output_size = len(word_to_idx)
     vocab_size = output_size
