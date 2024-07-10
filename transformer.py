@@ -1,12 +1,12 @@
-# Large Language Model v0.7 *Experimental*
+# Large Language Model v0.71 *Experimental*
 import numpy as np
 from collections import defaultdict
 import math
 import pickle
 
 # Model parameters
-hidden_size = 160 #last model saved requirement
-dictionary_memory_uncompressed = 180 # KB access
+hidden_size = 360 #last model saved requirement
+dictionary_memory_uncompressed = 380 # KB access
 learning_rate = 0.1
 epochs = 15
 generate_length = 100
@@ -53,7 +53,7 @@ def encode_sentence(sentence, word_to_idx, n, vocab_pmi):
         if ngram in word_to_idx:
             encoded[word_to_idx[ngram]-1] = vocab_pmi.get(ngram, 1.0)  # Use PMI value or default to 1.0 if not found
         else:
-            encoded[word_to_idx[padding_token]-1] = 1.0  # Assign 1.0 for <unk> token if n-gram is unknown
+            encoded[word_to_idx[padding_token]-1] = 0  # Assign 1.0 for <unk> token if n-gram is unknown
     return encoded
 
 def softmax(x):
