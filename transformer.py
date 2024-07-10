@@ -1,4 +1,4 @@
-# Large Language Model v0.4 *Experimental*
+# Large Language Model v0.6 *Experimental*
 import numpy as np
 from collections import defaultdict
 import math
@@ -47,7 +47,6 @@ def calculate_pmi(word1, word2, word_to_idx, co_occurrence_matrix, total_words):
     pmi = math.log(prob_co_occurrence / (prob_word1 * prob_word2))
 
     return pmi
-
 
 # Vocabulary creation including PMI values
 vocab_pmi = {}
