@@ -1,4 +1,4 @@
-# Large Language Model v0.8 *Experimental*
+# Large Language Model v0.91 *Experimental*
 import numpy as np
 from collections import defaultdict
 import math
@@ -142,7 +142,7 @@ def chat(model, question, generate_length, n):
         inverted_probabilities /= inverted_probabilities.sum()  # Normalize to ensure they sum to 1
 
         rng = np.random.default_rng()
-        predicted_idx = rng.choice(len(inverted_probabilities), p=inverted_probabilities)
+        predicted_idx = rng.choice(len(inverted_probabilities), p=roll_encoded_sentence(inverted_probabilities))
 
         if predicted_idx + 1 in idx_to_word:  # Adjust index to start from 0
             output.append(idx_to_word[predicted_idx + 1])
