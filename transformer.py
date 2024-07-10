@@ -1,19 +1,18 @@
-# Large Language Model v0.6 *Experimental*
+# Large Language Model v0.7 *Experimental*
 import numpy as np
 from collections import defaultdict
 import math
+import pickle
 
 # Model parameters
-hidden_size = 160
-dictionary_memory_uncompressed = 180
+hidden_size = 160 #last model saved requirement
+dictionary_memory_uncompressed = 180 # KB access
 learning_rate = 0.1
 epochs = 15
 generate_length = 100
 padding_token = '<unk>'
-
-# Load and preprocess data
-with open("test.txt", encoding="UTF-8") as f:
-    conversations = f.read().lower().split(".")[:dictionary_memory_uncompressed]
+model_file = "model.dat"
+n = 3
 
 # Create n-grams
 def create_ngrams(text, n):
@@ -21,9 +20,7 @@ def create_ngrams(text, n):
     ngrams = zip(*[words[i:] for i in range(n)])
     return [' '.join(ngram) for ngram in ngrams]
 
-# Function to calculate PMI (Example: Replace with actual PMI calculation based on your data)
-import math
-
+# Function to calculate PMI
 def calculate_pmi(word1, word2, word_to_idx, co_occurrence_matrix, total_words):
     if word1 not in word_to_idx or word2 not in word_to_idx:
         return 0.0  # Return 0 if either word is not in the vocabulary
@@ -47,32 +44,6 @@ def calculate_pmi(word1, word2, word_to_idx, co_occurrence_matrix, total_words):
     pmi = math.log(prob_co_occurrence / (prob_word1 * prob_word2))
 
     return pmi
-
-# Vocabulary creation including PMI values
-vocab_pmi = {}
-
-n = 3  # Choose the n-gram size
-vocab = set()
-
-for conv in conversations:
-    ngrams = create_ngrams(conv, n)
-    for ngram in ngrams:
-        if ngram not in vocab:
-            vocab.add(ngram)
-            if len(ngram.split()) == 2:  # Example for bigrams, adjust for your n-gram size
-                word_indices = [word_to_idx[word] for word in ngram.split()]
-                pmi = calculate_pmi(word_indices[0], word_indices[1], word_to_idx)
-                vocab_pmi[ngram] = pmi
-
-# Add a special token for unknown words
-vocab.add(padding_token)
-
-word_to_idx = {word: idx for idx, word in enumerate(vocab, start=1)}  # Start indexing from 1
-idx_to_word = {idx: word for word, idx in word_to_idx.items()}
-
-vocab_size = len(vocab)
-output_size = vocab_size
-input_size = vocab_size
 
 # Encoding function with <unk> token handling and PMI inclusion
 def encode_sentence(sentence, word_to_idx, n, vocab_pmi):
@@ -100,6 +71,10 @@ class SimpleChatbotNN:
         self.Wa = np.random.randn(hidden_size, hidden_size)
         self.ba = np.zeros(hidden_size)
         self.v = np.random.randn(hidden_size)
+
+        self.input_size = input_size
+        self.hidden_size = hidden_size
+        self.output_size = output_size
 
     def attention(self, hidden_states):
         # Compute attention scores
@@ -145,23 +120,39 @@ class SimpleChatbotNN:
         output = self.forward(x)
         return output
 
+    def save_model(self, filename):
+        model_params = {
+            'W1': self.W1,
+            'b1': self.b1,
+            'W2': self.W2,
+            'b2': self.b2,
+            'Wa': self.Wa,
+            'ba': self.ba,
+            'v': self.v,
+            'input_size': self.input_size,
+            'hidden_size': self.hidden_size,
+            'output_size': self.output_size
+        }
+        with open(filename, 'wb') as f:
+            pickle.dump(model_params, f)
+        print(f"Model saved to {filename}")
+
+    def load_model(self, filename):
+        with open(filename, 'rb') as f:
+            model_params = pickle.load(f)
+        self.W1 = model_params['W1']
+        self.b1 = model_params['b1']
+        self.W2 = model_params['W2']
+        self.b2 = model_params['b2']
+        self.Wa = model_params['Wa']
+        self.ba = model_params['ba']
+        self.input_size = model_params['input_size']
+        self.hidden_size = model_params['hidden_size']
+        self.output_size = model_params['output_size']
+        print(f"Model loaded from {filename}")
+
 def roll_encoded_sentence(encoded_sentence):
     return np.roll(encoded_sentence, 1)
-
-# Training loop
-model = SimpleChatbotNN(input_size, hidden_size, output_size)
-
-for epoch in range(epochs):
-    total_loss = 0
-    for conv in conversations:
-        input_seq = encode_sentence(conv, word_to_idx, n, vocab_pmi)
-        target_seq = roll_encoded_sentence(encode_sentence(conv, word_to_idx, n, vocab_pmi))
-
-        model.train(input_seq.reshape(1, -1), target_seq.reshape(1, -1))
-        total_loss += np.sum((model.forward(input_seq.reshape(1, -1)) - target_seq)**2)
-
-    if (epoch+1) % 1 == 0:
-        print(f"Epoch {epoch+1}, Loss: {total_loss}")
 
 def chat(model, question, generate_length, n):
     input_seq = encode_sentence(question, word_to_idx, n, vocab_pmi).reshape(1, -1)
@@ -189,8 +180,86 @@ def chat(model, question, generate_length, n):
 
     return ' '.join(output)
 
+def save_word_dict(word_dict, filename):
+    with open(filename, 'wb') as f:
+        pickle.dump(word_dict, f)
+    print(f"Dictionary saved to {filename}")
+
+# Function to load word_dict from a file
+def load_word_dict(filename):
+    with open(filename, 'rb') as f:
+        word_dict = pickle.load(f)
+    print(f"Dictionary loaded from {filename}")
+    return word_dict
+
+_choice_ = input("\nSave new model/Load old model?[s/l]:").lower()
+
+word_to_idx = {}
+idx_to_word = {}
+vocab_pmi = {}
+if (_choice_ == "s"):
+    # Load and preprocess data
+    with open("test.txt", encoding="UTF-8") as f:
+        conversations = f.read().lower().split(".")[:dictionary_memory_uncompressed]
+
+    # Vocabulary creation including PMI values
+
+  # Choose the n-gram size
+    vocab = set()
+
+    for conv in conversations:
+        ngrams = create_ngrams(conv, n)
+        for ngram in ngrams:
+            if ngram not in vocab:
+                vocab.add(ngram)
+                if len(ngram.split()) == 2:  # Example for bigrams, adjust for your n-gram size
+                    word_indices = [word_to_idx[word] for word in ngram.split()]
+                    pmi = calculate_pmi(word_indices[0], word_indices[1], word_to_idx)
+                    vocab_pmi[ngram] = pmi
+
+    # Add a special token for unknown words
+    vocab.add(padding_token)
+
+    # Process word dictionary
+    word_to_idx = {word: idx for idx, word in enumerate(vocab, start=1)}  # Start indexing from 1
+    idx_to_word = {idx: word for word, idx in word_to_idx.items()}
+    save_word_dict(word_to_idx, "langA.dat")
+    save_word_dict(idx_to_word, "langB.dat")
+    save_word_dict(vocab_pmi, "PMI_data.dat")
+
+    vocab_size = len(vocab)
+    output_size = vocab_size
+    input_size = vocab_size
+
+    model = SimpleChatbotNN(input_size, hidden_size, output_size)
+
+    # Training loop
+    for epoch in range(epochs):
+        total_loss = 0
+        for conv in conversations:
+            input_seq = encode_sentence(conv, word_to_idx, n, vocab_pmi)
+            target_seq = roll_encoded_sentence(encode_sentence(conv, word_to_idx, n, vocab_pmi))
+
+            model.train(input_seq.reshape(1, -1), target_seq.reshape(1, -1))
+            total_loss += np.sum((model.forward(input_seq.reshape(1, -1)) - target_seq)**2)
+
+        if (epoch+1) % 1 == 0:
+            print(f"Epoch {epoch+1}, Loss: {total_loss}")
+
+    model.save_model(model_file)
+
+if (_choice_ == "l"):
+    word_to_idx = load_word_dict("langA.dat")
+    idx_to_word = load_word_dict( "langB.dat")
+    vocab_pmi = load_word_dict("PMI_data.dat")
+    input_size = len(word_to_idx)
+    output_size = len(word_to_idx)
+    vocab_size = output_size
+    model = SimpleChatbotNN(input_size, hidden_size, output_size)
+    model.load_model(model_file)
+
 # Example usage
 while True:
     user_input = input("You: ")
     response = chat(model, user_input, generate_length, n)
-    print(f"GPT: {response}")
+    print(f"AI: {response}")
