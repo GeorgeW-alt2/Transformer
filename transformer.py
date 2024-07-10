@@ -1,225 +1,156 @@
-# Large Language Model v0.3 *Experimental*
+# Large Language Model v0.4 *Experimental*
 
 import numpy as np
 import random
-import pickle
 
-# Constants
-generate_len = 100
+# Model parameters
+hidden_size = 160
 dictionary_memory_uncompressed = 180
-hidden_size = 440
+learning_rate = 0.1
 epochs = 5
+generate_length = 100
+padding_token = '<unk>'
 
-compendium_filename = f"Compendium#{random.randint(0, 10000000)}.txt"
-file = "test.txt"
-word_dict_file = "word_dict.dat"
-model_file = "model.dat"
+# Load and preprocess data
+with open("test.txt", encoding="UTF-8") as f:
+    conversations = f.read().split(".")[:dictionary_memory_uncompressed]
 
-class RNN:
-    def __init__(self, input_size, hidden_size, output_size, learning_rate=0.01):
-        self.input_size = input_size
-        self.hidden_size = hidden_size
-        self.output_size = output_size
-        self.learning_rate = learning_rate
-        self.W_xh = np.random.randn(hidden_size, input_size) * 0.01
-        self.W_hh = np.random.randn(hidden_size, hidden_size) * 0.01
-        self.W_hy = np.random.randn(output_size, hidden_size) * 0.01
-        self.b_h = np.zeros((hidden_size, 1))
-        self.b_y = np.zeros((output_size, 1))
+# Create n-grams
+def create_ngrams(text, n):
+    words = text.split()
+    ngrams = zip(*[words[i:] for i in range(n)])
+    return [' '.join(ngram) for ngram in ngrams]
 
-    def save_model(self, filename):
-        model_params = {
-            'W_xh': self.W_xh,
-            'W_hh': self.W_hh,
-            'W_hy': self.W_hy,
-            'b_h': self.b_h,
-            'b_y': self.b_y,
-            'input_size': self.input_size,
-            'hidden_size': self.hidden_size,
-            'output_size': self.output_size,
-            'learning_rate': self.learning_rate
-        }
-        with open(filename, 'wb') as f:
-            pickle.dump(model_params, f)
-        print(f"Model saved to {filename}")
+# Vocabulary creation
+n = 3  # Choose the n-gram size
+vocab = set()
+for conv in conversations:
+    ngrams = create_ngrams(conv, n)
+    vocab.update(ngrams)
 
-    def load_model(self, filename):
-        with open(filename, 'rb') as f:
-            model_params = pickle.load(f)
-        self.W_xh = model_params['W_xh']
-        self.W_hh = model_params['W_hh']
-        self.W_hy = model_params['W_hy']
-        self.b_h = model_params['b_h']
-        self.b_y = model_params['b_y']
-        self.input_size = model_params['input_size']
-        self.hidden_size = model_params['hidden_size']
-        self.output_size = model_params['output_size']
-        self.learning_rate = model_params['learning_rate']
-        print(f"Model loaded from {filename}")
+# Add a special token for unknown words
+vocab.add(padding_token)
 
-    def forward(self, inputs, h_prev):
-        seq_len = inputs.shape[1]
-        h_next = h_prev
+word_to_idx = {word: idx for idx, word in enumerate(vocab, start=1)}  # Start indexing from 1
+idx_to_word = {idx: word for word, idx in word_to_idx.items()}
 
-        # Calculate memory accuracy for each time step
-        outputs = np.zeros((self.output_size, seq_len))
-        for t in range(seq_len):
-            x_t = inputs[:, t].reshape(-1, 1)
-            h_next = np.tanh(np.dot(self.W_xh, x_t) + np.dot(self.W_hh, h_next) + self.b_h)
-            y_t = np.dot(self.W_hy, h_prev) + self.b_y
-            outputs[:, t] =  y_t.squeeze()
-            h_prev = h_next
-        return outputs, h_next
+vocab_size = len(vocab)
+output_size = vocab_size
+input_size = vocab_size
 
-    def backward(self, inputs, targets, h_prev, outputs):
-        dW_xh, dW_hh, dW_hy = np.zeros_like(self.W_xh), np.zeros_like(self.W_hh), np.zeros_like(self.W_hy)
-        db_h, db_y = np.zeros_like(self.b_h), np.zeros_like(self.b_y)
-        dh_next = np.zeros_like(h_prev)
-
-        for t in reversed(range(len(inputs[0]))):
-            dy = outputs[:, t].reshape(-1, 1) - targets[:, t].reshape(-1, 1)
-            dW_hy += np.dot(dy, h_prev.T)
-            db_y += dy
-
-            dh = np.dot(self.W_hy.T, dy) + dh_next
-            dh_raw = (1 - h_prev ** 2) * dh
-            db_h += dh_raw
-            dW_xh += np.dot(dh_raw, inputs[:, t].reshape(1, -1))
-            dW_hh += np.dot(dh_raw, h_prev.T)
-            dh_next = np.dot(self.W_hh.T, dh_raw)
-
-        for dparam in [dW_xh, dW_hh, dW_hy, db_h, db_y]:
-            np.clip(dparam, -5, 5, out=dparam)
-
-        self.W_xh -= self.learning_rate * dW_xh
-        self.W_hh -= self.learning_rate * dW_hh
-        self.W_hy -= self.learning_rate * dW_hy
-        self.b_h -= self.learning_rate * db_h
-        self.b_y -= self.learning_rate * db_y
-
-    def train(self, inputs, targets, epochs):
-        print("Training started:")
-        for epoch in range(epochs):
-            h_prev = np.zeros((self.hidden_size, 1))
-            outputs, h_states = self.forward(inputs, h_prev)
-            self.backward(inputs, targets, h_states, outputs)
-            print(f'Epoch {epoch+1}/{epochs}')
-
-    def calculate_loss(self, outputs, targets):
-        loss = np.sum((outputs - targets) ** 2) / 2
-        return loss
+# Encoding function with <unk> token handling
+def encode_sentence(sentence, word_to_idx, n):
+    encoded = np.zeros(vocab_size)
+    ngrams = create_ngrams(sentence, n)
+    for ngram in ngrams:
+        if ngram in word_to_idx:
+            encoded[word_to_idx[ngram]-1] = 1  # Adjust index to start from 0
+        else:
+            encoded[word_to_idx[padding_token]-1] = 1  # Assign <unk> token index if n-gram is unknown
+    return encoded
 
 def softmax(x):
     e_x = np.exp(x - np.max(x))
     return e_x / e_x.sum(axis=0)
 
-def preprocess_text(text, n=3):
-    ngrams = []
-    words = text.split()
-    sentence_ngrams = [tuple(words[i:i + n]) for i in range(len(words) - n + 1)]
-    for ngram in sentence_ngrams:
-        ngram_str = ' '.join(ngram)
-        ngrams.append(ngram_str)
-    return list(ngrams)
+class SimpleChatbotNN:
+    def __init__(self, input_size, hidden_size, output_size):
+        self.W1 = np.random.randn(input_size, hidden_size)
+        self.b1 = np.zeros(hidden_size)
+        self.W2 = np.random.randn(hidden_size, output_size)
+        self.b2 = np.zeros(output_size)
 
-def find_word_index(word_dict, input_word):
-    results = []
-    for n in range(len(word_dict)):
-        try:
-            input_index = word_dict[n].split().index(input_word)
-            results.append(input_index)
-        except:
-            pass
-    return results
+        # Attention parameters
+        self.Wa = np.random.randn(hidden_size, hidden_size)
+        self.ba = np.zeros(hidden_size)
+        self.v = np.random.randn(hidden_size)
 
-def generate_text_rnn(rnn, user_input, word_dict, length_to_generate):
-    # Generate text using the RNN model
-    generated_text = user_input[:]
-    h_prev = np.zeros((hidden_size, 1))
-    input_vector = np.zeros((len(word_dict), 1))
+    def attention(self, hidden_states):
+        # Compute attention scores
+        attention_scores = np.dot(np.tanh(np.dot(hidden_states, self.Wa) + self.ba), self.v)
+        attention_weights = np.exp(attention_scores) / np.sum(np.exp(attention_scores), axis=0, keepdims=True)
+        context_vector = np.sum(attention_weights[:, np.newaxis] * hidden_states, axis=0)
+        return context_vector
 
-    # Initialize the input vector with the user input
-    for word in user_input:
-        input_indexes = find_word_index(word_dict, word)
-        for input_index in input_indexes:
-            input_vector[input_index] = 1
+    def forward(self, x):
+        self.hidden = np.dot(x, self.W1) + self.b1
+        self.hidden_activation = np.tanh(self.hidden)
 
-    for t in range(length_to_generate):
-        # Forward pass with memory accuracy
-        outputs, h_next = rnn.forward(input_vector, h_prev)
-        adjusted_probabilities = softmax(outputs.flatten())
+        # Apply attention
+        context_vector = self.attention(self.hidden_activation)
+
+        self.output = np.dot(context_vector, self.W2) + self.b2
+        self.output_probs = np.exp(self.output) / np.sum(np.exp(self.output), axis=-1, keepdims=True)
+        return self.output_probs
+
+    def backward(self, x, target, output):
+        d_output = output.copy()
+
+        dW2 = np.outer(self.attention(self.hidden_activation), d_output)
+        db2 = d_output
+
+        d_hidden_activation = np.dot(d_output, self.W2.T)
+        d_hidden = d_hidden_activation * (1 - np.power(self.hidden_activation, 2))
+
+        dW1 = np.dot(x.T, d_hidden)
+        db1 = d_hidden
+
+        # Update weights
+        self.W1 -= learning_rate * dW1
+        self.b1 -= learning_rate * db1.sum(axis=0)
+        self.W2 -= learning_rate * dW2
+        self.b2 -= learning_rate * db2.sum(axis=0)
+
+    def train(self, x, target):
+        output = self.forward(x)
+        self.backward(x, target, output)
+
+    def predict(self, x):
+        output = self.forward(x)
+        return output
+
+def roll_encoded_sentence(encoded_sentence):
+    return np.roll(encoded_sentence, 1)
+
+# Training loop
+model = SimpleChatbotNN(input_size, hidden_size, output_size)
+
+for epoch in range(epochs):
+    total_loss = 0
+    for conv in conversations:
+        input_seq = encode_sentence(conv, word_to_idx, n)
+        target_seq = roll_encoded_sentence(encode_sentence(conv, word_to_idx, n))
+
+        model.train(input_seq.reshape(1, -1), target_seq.reshape(1, -1))
+        total_loss += np.sum((model.forward(input_seq.reshape(1, -1)) - target_seq)**2)
+
+    if (epoch+1) % 1 == 0:
+        print(f"Epoch {epoch+1}, Loss: {total_loss}")
+
+def chat(model, question, generate_length, n):
+    input_seq = encode_sentence(question, word_to_idx, n).reshape(1, -1)
+    output = []
+
+    for i in range(generate_length):
+        idxs = model.predict(input_seq)
+        adjusted_probabilities = softmax(idxs.flatten())
 
         rng = np.random.default_rng()
-        next_index = rng.choice(len(adjusted_probabilities), p=adjusted_probabilities)
+        predicted_idx = rng.choice(len(adjusted_probabilities), p=adjusted_probabilities)
 
-        # Get the next word from the word_dict
-        next_word = word_dict[next_index]
-        generated_text.append(next_word)
+        if predicted_idx in idx_to_word:
+            output.append(idx_to_word[predicted_idx])
+        else:
+            output.append(padding_token)
 
-        # Prepare the input vector for the next step
-        input_vector[next_index] = 1
-        h_prev = h_next
-    return ' '.join(generated_text)
+        last_ngram = output[-1].split()[-(n-1):]
+        new_ngram = ' '.join(last_ngram + [idx_to_word[predicted_idx]])
+        input_seq = encode_sentence(new_ngram, word_to_idx, n).reshape(1, -1)
 
-# Function to save word_dict to a file
-def save_word_dict(word_dict, filename):
-    with open(filename, 'wb') as f:
-        pickle.dump(word_dict, f)
-    print(f"Word dictionary saved to {filename}")
+    return ' '.join(output)
 
-# Function to load word_dict from a file
-def load_word_dict(filename):
-    with open(filename, 'rb') as f:
-        word_dict = pickle.load(f)
-    print(f"Word dictionary loaded from {filename}")
-    return word_dict
-
-def main():
-    word_dict = None
-    _choice_ = input("\nSave new model/Load old model?[s/l]:").lower()
-    rnn = None
-    if (_choice_ == "l"):
-        try:
-            word_dict = load_word_dict(word_dict_file)
-            input_size = len(word_dict)
-            output_size = len(word_dict)
-            rnn = RNN(input_size, hidden_size, output_size)
-            rnn.load_model(model_file)
-        except FileNotFoundError:
-            word_dict = None
-
-    if (word_dict is None or _choice_ == "s"):
-        with open(file, encoding="UTF-8") as f:
-            text = f.read()
-        print("Learning from:", file)
-        word_dict = preprocess_text(text)[:dictionary_memory_uncompressed]
-        save_word_dict(word_dict, word_dict_file)
-
-        input_size = len(word_dict)
-        output_size = len(word_dict)
-        rnn = RNN(input_size, hidden_size, output_size)
-        h_prev = np.zeros((hidden_size, 1))
-
-        inputs = np.zeros((input_size, len(word_dict)))
-        targets = np.zeros((output_size, len(word_dict)))
-        for i, word in enumerate(word_dict):
-            input_indexes = find_word_index(word_dict, word)
-            for input_index in input_indexes:
-                inputs[input_index, i] = 1
-            targets[:, i] = np.roll(inputs[:, i], -1)
-            if i % 1000 == 0:
-                print(f'Dictionary learning progress: {i}/{len(word_dict)}')
-        print(f'Dictionary learning progress: {len(word_dict)}/{len(word_dict)}, complete!')
-
-        rnn.train(inputs, targets, epochs)
-        rnn.save_model(model_file)
-
-    while True:
-        u_input = input("USER: ").strip().lower().split()
-        rnn_generated_text = generate_text_rnn(rnn, u_input, word_dict, generate_len).lower()
-        print("\nAI:", rnn_generated_text, "\n\n")
-        with open(compendium_filename, "a", encoding="utf8") as f:
-            f.write(f"\nAnswering: {' '.join(u_input)}\n{rnn_generated_text}\n")
-
-if __name__ == "__main__":
-    main()
+# Example usage
+while True:
+    user_input = input("You: ")
+    response = chat(model, user_input, generate_length, n)
+    print(f"GPT: {response}")
