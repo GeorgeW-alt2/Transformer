@@ -1,11 +1,11 @@
 
-# Large Language Model v1.6 *Experimental*
+# Large Language Model v1.7 *Experimental*
 import numpy as np
 import math
 import pickle
 
 # Model parameters
-hidden_size = 260 #last model saved requirement
+hidden_size = 360 #last model saved requirement
 dictionary_memory_uncompressed = 180 # KB access
 learning_rate = 0.1
 epochs = 2
@@ -26,7 +26,7 @@ def encode_sentence(sentence, word_to_idx, n):
     ngrams = create_ngrams(sentence, n)
     for ngram in ngrams:
         if ngram in word_to_idx:
-            encoded[word_to_idx[ngram] - 1] = 0  # Use PMI value or default to 1.0 if not found
+            encoded[word_to_idx[ngram] - 1] = 1  # Use PMI value or default to 1.0 if not found
         else:
             encoded[word_to_idx[padding_token] - 1] = 0  #   # Assign 1.0 for <unk> token if n-gram is unknown
     return encoded
@@ -64,7 +64,7 @@ class SimpleChatbotNN:
 
         # Apply attention
         context_vector = self.attention(self.hidden_activation)
-        context_vector = precision_shift( context_vector, np.sum(x))
+        context_vector = precision_shift( context_vector, int(np.sum(x)))
 
         self.output = np.dot(context_vector, self.W2) + self.b2
         self.output_probs = np.exp(self.output) / np.sum(np.exp(self.output), axis=-1, keepdims=True)
