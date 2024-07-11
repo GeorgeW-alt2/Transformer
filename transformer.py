@@ -1,13 +1,14 @@
-# Large Language Model v1.4 *Experimental*
+
+# Large Language Model v1.5 *Experimental*
 import numpy as np
 import math
 import pickle
 
 # Model parameters
-hidden_size = 360 #last model saved requirement
+hidden_size = 260 #last model saved requirement
 dictionary_memory_uncompressed = 180 # KB access
 learning_rate = 0.1
-epochs = 15
+epochs = 2
 generate_length = 100
 padding_token = '<unk>'
 model_file = "model.dat"
@@ -63,7 +64,7 @@ class SimpleChatbotNN:
 
         # Apply attention
         context_vector = self.attention(self.hidden_activation)
-        context_vector = precision_shift( context_vector, np.sum(x))
+        context_vector = precision_shift( context_vector, np.max(x))
 
         self.output = np.dot(context_vector, self.W2) + self.b2
         self.output_probs = np.exp(self.output) / np.sum(np.exp(self.output), axis=-1, keepdims=True)
@@ -147,7 +148,7 @@ def chat(model, question, generate_length, n):
         inverted_probabilities /= inverted_probabilities.sum()  # Normalize to ensure they sum to 1
 
         rng = np.random.default_rng()
-        predicted_idx = rng.choice(range(len(inverted_probabilities)), p=inverted_probabilities)
+        predicted_idx = rng.choice(range(len(inverted_probabilities)), p=roll_encoded_sentence(inverted_probabilities))
         input_seq = precision_shift(input_seq, predicted_idx)
         if predicted_idx + 1 in idx_to_word:  # Adjust index to start from 0
             output.append(idx_to_word[predicted_idx + 1])
