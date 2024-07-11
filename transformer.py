@@ -1,5 +1,5 @@
 
-# Large Language Model v1.5 *Experimental*
+# Large Language Model v1.6 *Experimental*
 import numpy as np
 import math
 import pickle
@@ -53,7 +53,7 @@ class SimpleChatbotNN:
 
     def attention(self, hidden_states):
         # Compute attention scores
-        attention_scores = np.dot(np.tanh(np.dot(hidden_states, self.Wa) + self.ba), self.v)
+        attention_scores = np.inner(np.tanh(np.dot(hidden_states, self.Wa) + self.ba), self.v)
         attention_weights = np.exp(attention_scores) / np.sum(np.exp(attention_scores), axis=0, keepdims=True)
         context_vector = np.sum(attention_weights[:, np.newaxis] * hidden_states, axis=0)
         return context_vector
@@ -64,7 +64,7 @@ class SimpleChatbotNN:
 
         # Apply attention
         context_vector = self.attention(self.hidden_activation)
-        context_vector = precision_shift( context_vector, np.max(x))
+        context_vector = precision_shift( context_vector, np.sum(x))
 
         self.output = np.dot(context_vector, self.W2) + self.b2
         self.output_probs = np.exp(self.output) / np.sum(np.exp(self.output), axis=-1, keepdims=True)
