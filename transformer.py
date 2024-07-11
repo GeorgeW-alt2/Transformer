@@ -1,6 +1,5 @@
-# Large Language Model v1.2 *Experimental*
+# Large Language Model v1.3 *Experimental*
 import numpy as np
-from collections import defaultdict
 import math
 import pickle
 
@@ -14,33 +13,6 @@ padding_token = '<unk>'
 model_file = "model.dat"
 n = 3
 
-def calculate_pmi(ngrams, n):
-    word_counts = defaultdict(int)
-    ngram_counts = defaultdict(int)
-    total_words = 0
-    total_ngrams = 0
-
-    for conv in ngrams:
-        words = conv.split()
-        total_words += len(words)
-        for word in words:
-            word_counts[word] += 1
-
-        ngrams = create_ngrams(conv, n)
-        total_ngrams += len(ngrams)
-        for ngram in ngrams:
-            ngram_counts[ngram] += 1
-
-    pmi_values = {}
-    for ngram, count in ngram_counts.items():
-        words = ngram.split()
-        p_ngram = count / total_ngrams
-        p_words = np.prod([word_counts[word] / total_words for word in words])
-        pmi = math.log2(p_ngram / p_words)
-        pmi_values[ngram] = pmi
-
-    return pmi_values
-
 # Create n-grams
 def create_ngrams(text, n):
     words = text.split()
@@ -48,19 +20,19 @@ def create_ngrams(text, n):
     return [' '.join(ngram) for ngram in ngrams]
 
 # Encoding function with <unk> token handling and PMI inclusion
-def encode_sentence(sentence, word_to_idx, pmi_values, n):
+def encode_sentence(sentence, word_to_idx, n):
     encoded = np.zeros(vocab_size)
     ngrams = create_ngrams(sentence, n)
     for ngram in ngrams:
         if ngram in word_to_idx:
-            encoded[word_to_idx[ngram] - 1] = pmi_values.get(ngram, 1.0)  # Use PMI value or default to 1.0 if not found
+            encoded[word_to_idx[ngram] - 1] = 0  # Use PMI value or default to 1.0 if not found
         else:
-            encoded[word_to_idx[padding_token] - 1] = pmi_values.get(ngram, 0)  #   # Assign 1.0 for <unk> token if n-gram is unknown
+            encoded[word_to_idx[padding_token] - 1] = 0  #   # Assign 1.0 for <unk> token if n-gram is unknown
     return encoded
 
-def softmax(x):
-    e_x = np.exp(x - np.max(x))
-    return e_x / e_x.sum(axis=0)
+def softmax(logits):
+    exps = np.exp(logits - np.max(logits))  # Subtract max for numerical stability
+    return exps / np.sum(exps)
 
 class SimpleChatbotNN:
     def __init__(self, input_size, hidden_size, output_size):
@@ -91,6 +63,7 @@ class SimpleChatbotNN:
 
         # Apply attention
         context_vector = self.attention(self.hidden_activation)
+        context_vector = precision_shift( context_vector, np.sum(x))
 
         self.output = np.dot(context_vector, self.W2) + self.b2
         self.output_probs = np.exp(self.output) / np.sum(np.exp(self.output), axis=-1, keepdims=True)
@@ -107,7 +80,6 @@ class SimpleChatbotNN:
 
         dW1 = np.outer(x.T, d_hidden)
         db1 = d_hidden
-
         for dparam in [self.W1, self.b1, self.W2, self.b2]:
             np.clip(dparam, -5, 5, out=dparam)
 
@@ -159,13 +131,15 @@ class SimpleChatbotNN:
 def roll_encoded_sentence(encoded_sentence):
     return np.roll(encoded_sentence, -1)
 
+def precision_shift(encoded_sentence, shift_size):
+    return np.roll(encoded_sentence, shift_size)
+
 def chat(model, question, generate_length, n):
-    input_seq = encode_sentence(question, word_to_idx, pmi_values, n).reshape(1, -1)
+    input_seq = encode_sentence(question, word_to_idx, n).reshape(1, -1)
     output = []
 
     for i in range(generate_length):
         idxs = model.predict(input_seq)
-        idxs = roll_encoded_sentence(idxs)
         adjusted_probabilities = softmax(idxs.flatten())
 
         # Invert the adjusted probabilities
@@ -174,7 +148,7 @@ def chat(model, question, generate_length, n):
 
         rng = np.random.default_rng()
         predicted_idx = rng.choice(range(len(inverted_probabilities)), p=roll_encoded_sentence(inverted_probabilities))
-
+        input_seq = precision_shift(input_seq, predicted_idx)
         if predicted_idx + 1 in idx_to_word:  # Adjust index to start from 0
             output.append(idx_to_word[predicted_idx + 1])
         else:
@@ -182,7 +156,6 @@ def chat(model, question, generate_length, n):
 
         last_ngram = output[-1].split()[-(n-1):]
         new_ngram = ' '.join(last_ngram + [idx_to_word[predicted_idx + 1]])  # Adjust index to start from 0
-        input_seq = encode_sentence(new_ngram, word_to_idx, pmi_values, n).reshape(1, -1)
 
     return ' '.join(output)
 
@@ -218,9 +191,6 @@ if (_choice_ == "s"):
     # Add a special token for unknown words
     vocab.add(padding_token)
 
-    # Calculate PMI values
-    pmi_values = calculate_pmi(vocab, n)
-
     # Process word dictionary
     word_to_idx = {word: idx for idx, word in enumerate(vocab, start=1)}  # Start indexing from 1
     idx_to_word = {idx: word for word, idx in word_to_idx.items()}
@@ -237,8 +207,8 @@ if (_choice_ == "s"):
     for epoch in range(epochs):
         total_loss = 0
         for conv in conversations:
-            input_seq = encode_sentence(conv, word_to_idx, pmi_values, n)
-            target_seq = roll_encoded_sentence(encode_sentence(conv, word_to_idx, pmi_values, n))
+            input_seq = encode_sentence(conv, word_to_idx, n)
+            target_seq = roll_encoded_sentence(encode_sentence(conv, word_to_idx, n))
 
             model.train(input_seq.reshape(1, -1), target_seq.reshape(1, -1))
             total_loss += np.sum((model.forward(input_seq.reshape(1, -1)) - target_seq)**2)
