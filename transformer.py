@@ -1,4 +1,4 @@
-# Large Language Model v1.0 *Experimental*
+# Large Language Model v1.1 *Experimental*
 import numpy as np
 from collections import defaultdict
 import math
@@ -93,7 +93,7 @@ class SimpleChatbotNN:
         context_vector = self.attention(self.hidden_activation)
 
         self.output = np.dot(context_vector, self.W2) + self.b2
-        self.output_probs = np.exp(self.output) / np.sum(np.exp(self.output), axis=-1, keepdims=True)
+        self.output_probs = np.exp(self.output) / np.sum(np.exp(self.output), axis=0, keepdims=True)
         return self.output_probs
 
     def backward(self, x, target, output):
