@@ -1,5 +1,5 @@
 
-# Large Language Model v1.7 *Experimental*
+# Large Language Model v1.8 *Experimental*
 import numpy as np
 import math
 import pickle
@@ -33,7 +33,7 @@ def encode_sentence(sentence, word_to_idx, n):
 
 def softmax(logits):
     exps = np.exp(logits - np.max(logits))  # Subtract max for numerical stability
-    return exps / np.sum(exps)
+    return exps / np.exp(exps)
 
 class SimpleChatbotNN:
     def __init__(self, input_size, hidden_size, output_size):
