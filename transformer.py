@@ -1,4 +1,4 @@
-# Large Language Model v1.1 *Experimental*
+# Large Language Model v1.2 *Experimental*
 import numpy as np
 from collections import defaultdict
 import math
@@ -93,7 +93,7 @@ class SimpleChatbotNN:
         context_vector = self.attention(self.hidden_activation)
 
         self.output = np.dot(context_vector, self.W2) + self.b2
-        self.output_probs = np.exp(self.output) / np.sum(np.exp(self.output), axis=0, keepdims=True)
+        self.output_probs = np.exp(self.output) / np.sum(np.exp(self.output), axis=-1, keepdims=True)
         return self.output_probs
 
     def backward(self, x, target, output):
@@ -165,6 +165,7 @@ def chat(model, question, generate_length, n):
 
     for i in range(generate_length):
         idxs = model.predict(input_seq)
+        idxs = roll_encoded_sentence(idxs)
         adjusted_probabilities = softmax(idxs.flatten())
 
         # Invert the adjusted probabilities
@@ -259,5 +260,5 @@ if (_choice_ == "l"):
 # Example usage
 while True:
     user_input = input("You: ")
-    response = chat(model, chat(model, user_input, generate_length, n), generate_length, n)
+    response = chat(model, user_input, generate_length, n)
     print(f"AI: {response}")
