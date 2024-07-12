@@ -1,5 +1,5 @@
 
-# Large Language Model v1.8 *Experimental*
+# Large Language Model v1.9 *Experimental*
 import numpy as np
 import math
 import pickle
@@ -144,7 +144,7 @@ def chat(model, question, generate_length, n):
         adjusted_probabilities = softmax(idxs.flatten())
 
         # Invert the adjusted probabilities
-        inverted_probabilities = 1 / adjusted_probabilities
+        inverted_probabilities = -1 / adjusted_probabilities - np.maximum(idxs,adjusted_probabilities)
         inverted_probabilities /= inverted_probabilities.sum()  # Normalize to ensure they sum to 1
 
         rng = np.random.default_rng()
