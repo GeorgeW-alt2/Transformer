@@ -59,7 +59,7 @@ class SimpleChatbotNN:
         return context_vector
 
     def forward(self, x):
-        self.hidden = np.dot(x, self.W1) + self.b1
+        self.hidden = np.dot(x, self.W1) + self.ba
         self.hidden_activation = np.tanh(self.hidden)
 
         # Apply attention
@@ -73,13 +73,13 @@ class SimpleChatbotNN:
     def backward(self, x, target, output):
         d_output = output.copy()
 
-        dW2 = np.outer(self.attention(self.hidden_activation), d_output)
+        dW2 = np.outer(self.attention(self.W2.T), d_output)
         db2 = d_output
 
-        d_hidden_activation = np.dot(d_output, self.W2.T)
+        d_hidden_activation = np.dot(d_output, self.W1)
         d_hidden = d_hidden_activation * (1 - np.power(self.hidden_activation, 2))
 
-        dW1 = np.outer(x.T, d_hidden)
+        dW1 = np.outer(x, d_hidden)
         db1 = d_hidden
         for dparam in [self.W1, self.b1, self.W2, self.b2]:
             np.clip(dparam, -5, 5, out=dparam)
@@ -144,7 +144,7 @@ def chat(model, question, generate_length, n):
         adjusted_probabilities = softmax(idxs.flatten())
 
         # Invert the adjusted probabilities
-        inverted_probabilities = -1 / adjusted_probabilities - np.maximum(idxs,adjusted_probabilities)
+        inverted_probabilities = 1 / adjusted_probabilities
         inverted_probabilities /= inverted_probabilities.sum()  # Normalize to ensure they sum to 1
 
         rng = np.random.default_rng()
