@@ -1,12 +1,12 @@
 
-# Large Language Model v2.2 *Experimental*
+# Large Language Model v2.3 *Experimental*
 import numpy as np
 import math
 import pickle
 
 # Model parameters
 hidden_size = 360 #last model saved requirement
-dictionary_memory_uncompressed = 180 # KB access
+dictionary_memory_uncompressed = 80 # KB access
 learning_rate = 0.1
 epochs = 5
 generate_length = 100
@@ -155,7 +155,7 @@ def chat(model, question, generate_length, n):
 
         last_ngram = output[-1].split()[-(n-1):]
         new_ngram = ' '.join(last_ngram + [idx_to_word[predicted_idx + 1]])  # Adjust index to start from 0
-        input_seq = encode_sentence(new_ngram, word_to_idx, n)[:, np.newaxis].T
+        input_seq = encode_sentence(' '.join(output), word_to_idx, n)[:, np.newaxis].T
 
     return ' '.join(output)
 
