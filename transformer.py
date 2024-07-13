@@ -1,5 +1,5 @@
 
-# Large Language Model v1.9 *Experimental*
+# [:, np.newaxis]
 import numpy as np
 import math
 import pickle
@@ -8,7 +8,7 @@ import pickle
 hidden_size = 360 #last model saved requirement
 dictionary_memory_uncompressed = 180 # KB access
 learning_rate = 0.1
-epochs = 2
+epochs = 5
 generate_length = 100
 padding_token = '<unk>'
 model_file = "model.dat"
@@ -149,7 +149,6 @@ def chat(model, question, generate_length, n):
 
         rng = np.random.default_rng()
         predicted_idx = rng.choice(range(len(inverted_probabilities)), p=roll_encoded_sentence(inverted_probabilities))
-        input_seq = precision_shift(input_seq, predicted_idx)
         if predicted_idx + 1 in idx_to_word:  # Adjust index to start from 0
             output.append(idx_to_word[predicted_idx + 1])
         else:
@@ -157,6 +156,7 @@ def chat(model, question, generate_length, n):
 
         last_ngram = output[-1].split()[-(n-1):]
         new_ngram = ' '.join(last_ngram + [idx_to_word[predicted_idx + 1]])  # Adjust index to start from 0
+        input_seq = encode_sentence(new_ngram, word_to_idx, n)[:, np.newaxis].T
 
     return ' '.join(output)
 
