@@ -1,5 +1,5 @@
 
-# Large Language Model v2.4 *Experimental*
+# Large Language Model v3.0 *Experimental*
 import numpy as np
 import math
 import pickle
@@ -177,7 +177,6 @@ if (_choice_ == "s"):
     # Load and preprocess data
     with open("test.txt", encoding="UTF-8") as f:
         conversations = f.read().lower().split(".")[:dictionary_memory_uncompressed]
-
 
     # Vocabulary creation including PMI values
     vocab = set()
