@@ -1,12 +1,12 @@
 
-# Large Language Model v3.0 *Experimental*
+# Large Language Model v3.1 *Experimental*
 import numpy as np
 import math
 import pickle
 
 # Model parameters
 hidden_size = 360 #last model saved requirement
-dictionary_memory_uncompressed = 80 # KB access
+dictionary_memory_uncompressed = 180 # KB access
 learning_rate = 0.1
 epochs = 5
 generate_length = 100
@@ -203,9 +203,10 @@ if (_choice_ == "s"):
     # Training loop
     for epoch in range(epochs):
         total_loss = 0
-        for conv in conversations:
-            input_seq = encode_sentence(conv, word_to_idx, n)
-            target_seq = roll_encoded_sentence(encode_sentence(conv, word_to_idx, n))
+        for i,conv in enumerate(conversations):
+            if i < len(conversations)-1:
+                input_seq = encode_sentence(conv, word_to_idx, n)
+                target_seq = encode_sentence(conversations[i+1], word_to_idx, n)
 
             model.train(input_seq.reshape(1, -1), target_seq.reshape(1, -1))
             total_loss += np.sum((model.forward(input_seq.reshape(1, -1)) - target_seq)**2)
