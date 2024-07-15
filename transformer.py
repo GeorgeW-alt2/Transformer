@@ -1,5 +1,5 @@
 
-# Large Language Model v4.0 *Experimental*
+# Large Language Model v4.1 *Experimental*
 import numpy as np
 import pickle
 
@@ -32,8 +32,9 @@ def softmax(logits):
 
 def chat(question, word_to_idx, generate_length, n):
     output = []
+    input_seq = encode_sentence(question, word_to_idx, n*3)
+
     for i in range(generate_length):
-        input_seq = encode_sentence(question, word_to_idx, n)
         adjusted_probabilities = softmax(input_seq.flatten())
 
         # Invert the adjusted probabilities
@@ -47,7 +48,7 @@ def chat(question, word_to_idx, generate_length, n):
         else:
             output.append(padding_token)
 
-        input_seq = encode_sentence(question + " " + ' '.join(output), word_to_idx, n)[:, np.newaxis].T
+        input_seq = encode_sentence(' '.join(output), word_to_idx, n)[:, np.newaxis].T
 
     return ' '.join(output)
 
