@@ -1,5 +1,5 @@
 
-# Large Language Model v3.1 *Experimental*
+# Large Language Model v3.2 *Experimental*
 import numpy as np
 import math
 import pickle
@@ -153,7 +153,7 @@ def chat(model, question, generate_length, n):
         else:
             output.append(padding_token)
 
-        input_seq = encode_sentence(' '.join(output), word_to_idx, n)[:, np.newaxis].T
+        input_seq = encode_sentence(question+ " " + ' '.join(output), word_to_idx, n)[:, np.newaxis].T
 
     return ' '.join(output)
 
