@@ -1,12 +1,12 @@
 
-# Large Language Model v3.2 *Experimental*
+# Large Language Model v3.3 *Experimental*
 import numpy as np
 import math
 import pickle
 
 # Model parameters
 hidden_size = 360 #last model saved requirement
-dictionary_memory_uncompressed = 180 # KB access
+dictionary_memory_uncompressed = 80 # KB access
 learning_rate = 0.1
 epochs = 5
 generate_length = 100
@@ -134,12 +134,10 @@ def roll_encoded_sentence(encoded_sentence):
 def precision_shift(encoded_sentence, shift_size):
     return np.roll(encoded_sentence, shift_size)
 
-def chat(model, question, generate_length, n):
-    input_seq = encode_sentence(question, word_to_idx, n).reshape(1, -1)
+def chat(model, question, word_to_idx, generate_length, n):
     output = []
-
     for i in range(generate_length):
-        idxs = model.predict(input_seq)
+        idxs = encode_sentence(question, word_to_idx, n)
         adjusted_probabilities = softmax(idxs.flatten())
 
         # Invert the adjusted probabilities
@@ -228,5 +226,5 @@ if (_choice_ == "l"):
 # Example usage
 while True:
     user_input = input("You: ")
-    response = chat(model, user_input, generate_length, n)
+    response = chat(model, user_input, word_to_idx, generate_length, n)
     print(f"AI: {response}")
