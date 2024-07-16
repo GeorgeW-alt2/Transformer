@@ -1,4 +1,4 @@
-# Large Language Model v4.2 *Experimental*
+# Large Language Model v4.3 *Experimental*
 
 import numpy as np
 import pickle
@@ -19,7 +19,7 @@ def create_ngrams(text, n):
 
 # Check if an n-gram contains only alphanumeric characters and spaces
 def is_valid_ngram(ngram):
-    return re.match("^[a-zA-Z0-9\s]*$", ngram) is not None
+    return re.match("^[a-zA-Z0-9\s.]*$", ngram) is not None
 
 # Encoding function with <unk> token handling
 def encode_sentence(sentence, word_to_idx, n):
@@ -34,7 +34,7 @@ def encode_sentence(sentence, word_to_idx, n):
 
 # Random Fourier Features transformation
 def rff_mapping(input_vec, W, b):
-    return np.sqrt(2 / D) * np.cos(np.dot(W, input_vec) + b)
+    return np.sqrt(2 / D) * np.tanh(np.dot(W, input_vec) + b)
 
 def softmax(logits):
     exps = np.exp(logits - np.max(logits))  # Subtract max for numerical stability
@@ -78,11 +78,24 @@ def load_word_dict(filename):
     print(f"Dictionary loaded from {filename}")
     return word_dict
 
+# Function to save RFF parameters to a file
+def save_rff_params(W, b, filename):
+    with open(filename, 'wb') as f:
+        pickle.dump((W, b), f)
+    print(f"RFF parameters saved to {filename}")
+
+# Function to load RFF parameters from a file
+def load_rff_params(filename):
+    with open(filename, 'rb') as f:
+        W, b = pickle.load(f)
+    print(f"RFF parameters loaded from {filename}")
+    return W, b
+
 _choice_ = input("\nSave new model/Load old model?[s/l]:").lower()
 
 word_to_idx = {}
 idx_to_word = {}
-if (_choice_ == "s"):
+if _choice_ == "s":
     # Load and preprocess data
     with open("test.txt", encoding="UTF-8") as f:
         conversations = f.read().lower().split(".")[:KB_memory_uncompressed]
@@ -104,13 +117,15 @@ if (_choice_ == "s"):
     save_word_dict(word_to_idx, "langA.dat")
     save_word_dict(idx_to_word, "langB.dat")
 
-if (_choice_ == "l"):
+    # Initialize RFF parameters
+    W = np.random.randn(D, len(word_to_idx)) * 0.01
+    b = np.random.uniform(0, 2 * np.pi, D)
+    save_rff_params(W, b, "rff_params.dat")
+
+if _choice_ == "l":
     word_to_idx = load_word_dict("langA.dat")
     idx_to_word = load_word_dict("langB.dat")
-
-# Initialize RFF parameters
-W = np.random.randn(D, len(word_to_idx)) * 0.01
-b = np.random.uniform(0, 2 * np.pi, D)
+    W, b = load_rff_params("rff_params.dat")
 
 # Example usage
 while True:
