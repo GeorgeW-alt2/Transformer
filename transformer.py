@@ -1,19 +1,25 @@
+# Large Language Model v4.2 *Experimental*
 
-# Large Language Model v4.1 *Experimental*
 import numpy as np
 import pickle
+import re
 
 # Model parameters
-KB_memory_uncompressed = -1 # KB access, -1 for unlimited
+KB_memory_uncompressed = -1  # KB access, -1 for unlimited
 generate_length = 100
 padding_token = '<unk>'
 n = 3
+D = 200  # Dimensionality of the RFF mapping
 
-# Create n-grams
+# Create n-grams and filter out n-grams with symbols
 def create_ngrams(text, n):
     words = text.split()
     ngrams = zip(*[words[i:] for i in range(n)])
     return [' '.join(ngram) for ngram in ngrams]
+
+# Check if an n-gram contains only alphanumeric characters and spaces
+def is_valid_ngram(ngram):
+    return re.match("^[a-zA-Z0-9\s]*$", ngram) is not None
 
 # Encoding function with <unk> token handling
 def encode_sentence(sentence, word_to_idx, n):
@@ -26,16 +32,21 @@ def encode_sentence(sentence, word_to_idx, n):
             encoded[word_to_idx[padding_token] - 1] = 0
     return encoded
 
+# Random Fourier Features transformation
+def rff_mapping(input_vec, W, b):
+    return np.sqrt(2 / D) * np.cos(np.dot(W, input_vec) + b)
+
 def softmax(logits):
     exps = np.exp(logits - np.max(logits))  # Subtract max for numerical stability
-    return exps / np.exp(exps)
+    return exps / np.sum(exps)
 
-def chat(question, word_to_idx, generate_length, n):
+def chat(question, word_to_idx, generate_length, n, W, b):
     output = []
-    input_seq = encode_sentence(question, word_to_idx, n*3)
+    input_seq = encode_sentence(question, word_to_idx, n)
+    rff_input = rff_mapping(input_seq, W, b)
 
     for i in range(generate_length):
-        adjusted_probabilities = softmax(input_seq.flatten())
+        adjusted_probabilities = softmax(rff_input.flatten())
 
         # Invert the adjusted probabilities
         inverted_probabilities = 1 / adjusted_probabilities
@@ -48,7 +59,9 @@ def chat(question, word_to_idx, generate_length, n):
         else:
             output.append(padding_token)
 
-        input_seq = encode_sentence(' '.join(output), word_to_idx, n)[:, np.newaxis].T
+        next_input = ' '.join(output)
+        input_seq = encode_sentence(next_input, word_to_idx, n)
+        rff_input = rff_mapping(input_seq, W, b)
 
     return ' '.join(output)
 
@@ -79,7 +92,8 @@ if (_choice_ == "s"):
     for conv in conversations:
         ngrams = create_ngrams(conv, n)
         for ngram in ngrams:
-            vocab.add(ngram)
+            if is_valid_ngram(ngram):
+                vocab.add(ngram)
 
     # Add a special token for unknown words
     vocab.add(padding_token)
@@ -94,8 +108,12 @@ if (_choice_ == "l"):
     word_to_idx = load_word_dict("langA.dat")
     idx_to_word = load_word_dict("langB.dat")
 
+# Initialize RFF parameters
+W = np.random.randn(D, len(word_to_idx)) * 0.01
+b = np.random.uniform(0, 2 * np.pi, D)
+
 # Example usage
 while True:
     user_input = input("You: ")
-    response = chat(user_input, word_to_idx, generate_length, n)
+    response = chat(user_input, word_to_idx, generate_length, n, W, b)
     print(f"AI: {response}")
