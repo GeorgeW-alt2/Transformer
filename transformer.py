@@ -1,15 +1,15 @@
-# Large Language Model v4.3 *Experimental*
-
+# Large Language Model v5.0
 import numpy as np
 import pickle
 import re
 
 # Model parameters
-KB_memory_uncompressed = -1  # KB access, -1 for unlimited
+KB_memory_uncompressed = 100 # KB access, -1 for unlimited
 generate_length = 100
 padding_token = '<unk>'
 n = 3
 D = 200  # Dimensionality of the RFF mapping
+learning_rate = 0.01  # Learning rate for training
 
 # Create n-grams and filter out n-grams with symbols
 def create_ngrams(text, n):
@@ -91,6 +91,32 @@ def load_rff_params(filename):
     print(f"RFF parameters loaded from {filename}")
     return W, b
 
+def train_rff(sentences, word_to_idx, n, W, b, learning_rate, epochs):
+    for epoch in range(epochs):
+        total_loss = 0
+        for sentence in sentences:
+            input_seq = encode_sentence(sentence, word_to_idx, n)
+            rff_input = rff_mapping(input_seq, W, b)
+            target_seq = encode_sentence(sentence, word_to_idx, n)
+
+            # Ensure target_seq has the same shape as rff_input
+            if target_seq.shape != rff_input.shape:
+                target_seq = target_seq[:rff_input.shape[0]]
+
+            # Calculate error
+            error = rff_input - target_seq
+
+            # Update weights and biases
+            W -= learning_rate * np.outer(error, input_seq)
+            b -= learning_rate * error
+
+            # Calculate loss (Mean Squared Error)
+            loss = np.mean(error ** 2)
+            total_loss += loss
+
+        avg_loss = total_loss / len(sentences)
+        print(f'Epoch {epoch+1}/{epochs}, Loss: {avg_loss:.4f}')
+
 _choice_ = input("\nSave new model/Load old model?[s/l]:").lower()
 
 word_to_idx = {}
@@ -121,6 +147,10 @@ if _choice_ == "s":
     W = np.random.randn(D, len(word_to_idx)) * 0.01
     b = np.random.uniform(0, 2 * np.pi, D)
     save_rff_params(W, b, "rff_params.dat")
+
+    # Train the model
+    train_rff(conversations, word_to_idx, n, W, b, learning_rate, epochs=10)
+    save_rff_params(W, b, "rff_params.dat")  # Save trained parameters
 
 if _choice_ == "l":
     word_to_idx = load_word_dict("langA.dat")
