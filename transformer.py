@@ -1,4 +1,4 @@
-# Large Language Model v5.0
+# Large Language Model v5.1
 import numpy as np
 import pickle
 import re
@@ -146,7 +146,6 @@ if _choice_ == "s":
     # Initialize RFF parameters
     W = np.random.randn(D, len(word_to_idx)) * 0.01
     b = np.random.uniform(0, 2 * np.pi, D)
-    save_rff_params(W, b, "rff_params.dat")
 
     # Train the model
     train_rff(conversations, word_to_idx, n, W, b, learning_rate, epochs=10)
