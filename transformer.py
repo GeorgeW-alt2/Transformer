@@ -1,13 +1,14 @@
-# Large Language Model v5.4
+# Large Language Model v5.5
 
 import numpy as np
 import pickle
 import re
+import math
 
 # Model parameters
 KB_memory_uncompressed = 100  # KB access, -1 for unlimited
 generate_length = 100
-epochs=25
+epochs = 5
 n = 3
 D = 200  # Dimensionality of the RFF mapping
 learning_rate = 0.01  # Learning rate for training
@@ -35,7 +36,12 @@ def encode_sentence(sentence, word_to_idx, n):
 
 # Random Fourier Features transformation
 def rff_mapping(input_vec, W, b):
-    return np.sqrt(2 / D) * np.tanh(np.dot(W, input_vec) + b)
+    feature_vec = []
+    for i in range(D):
+        random_projection = sum(W[i][j] * input_vec[j] for j in range(len(input_vec)))
+        feature = math.sqrt(2/D) * math.tanh(random_projection + b[i])
+        feature_vec.append(feature)
+    return feature_vec
 
 def softmax(logits):
     exps = np.exp(logits - np.max(logits))  # Subtract max for numerical stability
@@ -44,7 +50,7 @@ def softmax(logits):
 def chat(question, word_to_idx, generate_length, n, W, b):
     output = []
     input_seq = encode_sentence(question, word_to_idx, n)
-    rff_input = rff_mapping(input_seq, W, b)
+    rff_input = np.array(rff_mapping(input_seq, W, b))
 
     for i in range(generate_length):
         adjusted_probabilities = softmax(rff_input.flatten())
@@ -58,7 +64,7 @@ def chat(question, word_to_idx, generate_length, n, W, b):
 
         next_input = ' '.join(output)
         input_seq = encode_sentence(' '.join(output), word_to_idx, n)
-        rff_input = rff_mapping(input_seq, W, b)
+        rff_input = np.array(rff_mapping(input_seq, W, b))
 
     return ' '.join(output)
 
@@ -93,7 +99,7 @@ def train_rff(sentences, word_to_idx, n, W, b, learning_rate, epochs):
         total_loss = 0
         for sentence in sentences:
             input_seq = encode_sentence(sentence, word_to_idx, n)
-            rff_input = rff_mapping(input_seq, W, b)
+            rff_input = np.array(rff_mapping(input_seq, W, b))
             target_seq = encode_sentence(sentence, word_to_idx, n)
 
             # Ensure target_seq has the same shape as rff_input
