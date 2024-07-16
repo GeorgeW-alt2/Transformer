@@ -1,4 +1,4 @@
-# Large Language Model v5.2
+# Large Language Model v5.4
 
 import numpy as np
 import pickle
@@ -57,7 +57,7 @@ def chat(question, word_to_idx, generate_length, n, W, b):
             output.append(padding_token)
 
         next_input = ' '.join(output)
-        input_seq = encode_sentence(next_input, word_to_idx, n)
+        input_seq = encode_sentence(' '.join(output), word_to_idx, n)
         rff_input = rff_mapping(input_seq, W, b)
 
     return ' '.join(output)
