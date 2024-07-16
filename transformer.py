@@ -1,16 +1,17 @@
 # Large Language Model v5.1
+
 import numpy as np
 import pickle
 import re
 
 # Model parameters
-KB_memory_uncompressed = 100 # KB access, -1 for unlimited
+KB_memory_uncompressed = 100  # KB access, -1 for unlimited
 generate_length = 100
-padding_token = '<unk>'
+epochs=25
 n = 3
 D = 200  # Dimensionality of the RFF mapping
 learning_rate = 0.01  # Learning rate for training
-
+padding_token = '<unk>'
 # Create n-grams and filter out n-grams with symbols
 def create_ngrams(text, n):
     words = text.split()
@@ -48,12 +49,8 @@ def chat(question, word_to_idx, generate_length, n, W, b):
     for i in range(generate_length):
         adjusted_probabilities = softmax(rff_input.flatten())
 
-        # Invert the adjusted probabilities
-        inverted_probabilities = 1 / adjusted_probabilities
-        inverted_probabilities /= inverted_probabilities.sum()  # Normalize to ensure they sum to 1
-
         rng = np.random.default_rng()
-        predicted_idx = rng.choice(range(len(inverted_probabilities)), p=inverted_probabilities)
+        predicted_idx = rng.choice(range(len(adjusted_probabilities)), p=adjusted_probabilities)
         if predicted_idx + 1 in idx_to_word:  # Adjust index to start from 0
             output.append(idx_to_word[predicted_idx + 1])
         else:
@@ -103,6 +100,9 @@ def train_rff(sentences, word_to_idx, n, W, b, learning_rate, epochs):
             if target_seq.shape != rff_input.shape:
                 target_seq = target_seq[:rff_input.shape[0]]
 
+            # Roll the target sequence
+            target_seq = np.roll(target_seq, shift=-1)
+
             # Calculate error
             error = rff_input - target_seq
 
@@ -138,7 +138,7 @@ if _choice_ == "s":
     vocab.add(padding_token)
 
     # Process word dictionary
-    word_to_idx = {word: idx for idx, word in enumerate(vocab, start=1)}  # Start indexing from 1
+    word_to_idx = {word: idx for idx, word in enumerate(vocab, start=0)}
     idx_to_word = {idx: word for word, idx in word_to_idx.items()}
     save_word_dict(word_to_idx, "langA.dat")
     save_word_dict(idx_to_word, "langB.dat")
@@ -148,7 +148,7 @@ if _choice_ == "s":
     b = np.random.uniform(0, 2 * np.pi, D)
 
     # Train the model
-    train_rff(conversations, word_to_idx, n, W, b, learning_rate, epochs=10)
+    train_rff(conversations, word_to_idx, n, W, b, learning_rate, epochs)
     save_rff_params(W, b, "rff_params.dat")  # Save trained parameters
 
 if _choice_ == "l":
