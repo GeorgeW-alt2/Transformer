@@ -1,4 +1,4 @@
-# Large Language Model v5.5
+# Large Language Model v5.7 - George W
 
 import numpy as np
 import pickle
@@ -38,7 +38,7 @@ def encode_sentence(sentence, word_to_idx, n):
 def rff_mapping(input_vec, W, b):
     feature_vec = []
     for i in range(D):
-        random_projection = sum(W[i][j] * input_vec[j] for j in range(len(input_vec)))
+        random_projection = max(W[i][j] * input_vec[j] for j in range(len(input_vec)))
         feature = math.sqrt(2/D) * math.tanh(random_projection + b[i])
         feature_vec.append(feature)
     return feature_vec
