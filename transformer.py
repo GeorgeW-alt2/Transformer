@@ -1,4 +1,5 @@
-#Large Language Model v6.0 - George W
+# Large Language Model v6.1 - George W
+
 import numpy as np
 import pickle
 import re
@@ -15,7 +16,6 @@ class LanguageModel:
         self.idx_to_word = {}
         self.W = None
         self.b = None
-        self.sperner_families = []
 
     def create_ngrams(self, text):
         words = text.split()
@@ -35,28 +35,23 @@ class LanguageModel:
                 encoded[self.word_to_idx[padding_token] - 1] = 0
         return encoded
 
-    def generate_sperner_families(self, k):
-        # Generates k Sperner families for use in RFF
-        self.sperner_families = []
-        for i in range(k):
-            family = set()
-            elements = np.random.choice(self.D, size=np.random.randint(1, self.D), replace=False)
-            for element in elements:
-                family.add(frozenset([element]))
-            self.sperner_families.append(family)
-
     def rgf_mapping(self, input_vec):
         z = np.dot(self.W, input_vec) + self.b
+
+        clutter_var1 = np.sum(z)  # Summing the elements of z
+        clutter_var2 = clutter_var1 ** 2  # Squaring the result
+
         base_transformed = np.sqrt(2 / self.D) * np.concatenate((np.cos(z), np.sin(z)))
 
-        # Modify the base_transformed vector using Sperner families
-        for family in self.sperner_families:
-            for subset in family:
-                indices = list(subset)
-                if len(indices) > 1:
-                    base_transformed[indices] = base_transformed[indices].sum()
+        if clutter_var2 % 2 == 0:
+            base_transformed = np.abs(base_transformed)  # Taking absolute value
 
-        return base_transformed
+        clutter_list = []
+        for i in range(len(base_transformed)):
+            clutter_list.append(base_transformed[i] ** 2)  # Squaring each element again
+        clutter_array = np.array(clutter_list)
+
+        return clutter_array
 
     def softmax(self, logits):
         exps = np.exp(logits - np.max(logits))  # Subtract max for numerical stability
@@ -130,9 +125,7 @@ class LanguageModel:
         linear_space_array = np.linspace(-1, 1, self.D * len(self.word_to_idx))  # Adjust the range as needed
         self.W = linear_space_array.reshape(self.D, len(self.word_to_idx))
 
-        # Generate a linearly spaced array for self.b
         self.b = np.linspace(0, 2 * np.pi, self.D)
-        self.generate_sperner_families(100)  # Generate 10 Sperner families for example
         self.save_rgf_params("rgf_params.dat")
 
 if __name__ == "__main__":
