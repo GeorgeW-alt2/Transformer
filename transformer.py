@@ -1,10 +1,10 @@
-# Large Language Model v6.1 - George W
+# Large Language Model v6.3 - George W
 
 import numpy as np
 import pickle
 import re
 
-KB_memory_uncompressed = -1  # KB access, -1 for unlimited
+KB_memory_uncompressed = -1 # KB access, -1 for unlimited
 generate_length = 100
 padding_token = '<unk>'
 
@@ -32,26 +32,20 @@ class LanguageModel:
             if ngram in self.word_to_idx:
                 encoded[self.word_to_idx[ngram] - 1] = 1
             else:
-                encoded[self.word_to_idx[padding_token] - 1] = 0
+                encoded[self.word_to_idx[padding_token] - 1] = 1
         return encoded
 
     def rgf_mapping(self, input_vec):
         z = np.dot(self.W, input_vec) + self.b
 
-        clutter_var1 = np.sum(z)  # Summing the elements of z
-        clutter_var2 = clutter_var1 ** 2  # Squaring the result
-
         base_transformed = np.sqrt(2 / self.D) * np.concatenate((np.cos(z), np.sin(z)))
 
-        if clutter_var2 % 2 == 0:
-            base_transformed = np.abs(base_transformed)  # Taking absolute value
-
-        clutter_list = []
+        base_list = []
         for i in range(len(base_transformed)):
-            clutter_list.append(base_transformed[i] ** 2)  # Squaring each element again
-        clutter_array = np.array(clutter_list)
+            base_list.append(base_transformed ** 2)  # Squaring each element again
+        base_array = np.array(base_list)
 
-        return clutter_array
+        return base_array
 
     def softmax(self, logits):
         exps = np.exp(logits - np.max(logits))  # Subtract max for numerical stability
