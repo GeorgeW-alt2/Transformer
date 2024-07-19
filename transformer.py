@@ -1,21 +1,23 @@
-# Large Language Model v6.3 - George W
+# Large Language Model v6.4 - George W
 
 import numpy as np
 import pickle
 import re
 
-KB_memory_uncompressed = -1 # KB access, -1 for unlimited
+KB_memory_uncompressed = 1000  # KB access, -1 for unlimited
 generate_length = 100
 padding_token = '<unk>'
 
 class LanguageModel:
-    def __init__(self, n=3, D=200):
+    def __init__(self, n=3, D=200, learning_rate=0.01):
         self.n = n
         self.D = D
+        self.learning_rate = learning_rate
         self.word_to_idx = {}
         self.idx_to_word = {}
         self.W = None
         self.b = None
+        self.cell_weights = None
 
     def create_ngrams(self, text):
         words = text.split()
@@ -37,19 +39,30 @@ class LanguageModel:
 
     def rgf_mapping(self, input_vec):
         z = np.dot(self.W, input_vec) + self.b
-
         base_transformed = np.sqrt(2 / self.D) * np.concatenate((np.cos(z), np.sin(z)))
-
-        base_list = []
-        for i in range(len(base_transformed)):
-            base_list.append(base_transformed ** 2)  # Squaring each element again
-        base_array = np.array(base_list)
-
-        return base_array
+        return base_transformed
 
     def softmax(self, logits):
         exps = np.exp(logits - np.max(logits))  # Subtract max for numerical stability
         return exps / np.sum(exps)
+
+    def train_step(self, input_seq, target):
+        # Forward pass
+        rgf_input = self.rgf_mapping(input_seq)
+        predictions = self.softmax(rgf_input.flatten())
+
+
+        # Backward pass (Gradient placeholders)
+        gradients = np.random.randn(*self.W.shape)  # Replace with actual gradient computation
+        self.W -= self.learning_rate * gradients
+
+    def train(self, epochs, data, targets):
+        for epoch in range(epochs):
+            total_loss = 0
+            for input_seq, target in zip(data, targets):
+                self.train_step(input_seq, target)
+
+            print(f"Epoch {epoch + 1}/{epochs}")
 
     def chat(self, question):
         output = []
@@ -122,6 +135,32 @@ class LanguageModel:
         self.b = np.linspace(0, 2 * np.pi, self.D)
         self.save_rgf_params("rgf_params.dat")
 
+    def generate_training_data(self, filename):
+        with open(filename, encoding="UTF-8") as f:
+            text = f.read().lower()
+
+        sentences = text.split(".")[:KB_memory_uncompressed]
+        sentences = [s.strip() for s in sentences if s.strip()]
+
+        data = []
+        targets = []
+
+        for sentence in sentences:
+            ngrams = self.create_ngrams(sentence)
+            encoded_input = self.encode_sentence(sentence)
+            encoded_target = np.zeros(len(self.word_to_idx))
+
+            for ngram in ngrams:
+                if ngram in self.word_to_idx:
+                    encoded_target[self.word_to_idx[ngram] - 1] = 1
+                else:
+                    encoded_target[self.word_to_idx[padding_token] - 1] = 1
+
+            data.append(encoded_input)
+            targets.append(encoded_target)
+
+        return data, targets
+
 if __name__ == "__main__":
     model = LanguageModel()
 
@@ -134,6 +173,12 @@ if __name__ == "__main__":
         model.word_to_idx = model.load_word_dict("langA.dat")
         model.idx_to_word = model.load_word_dict("langB.dat")
         model.W, model.b = model.load_rgf_params("rgf_params.dat")
+
+    # Generate training data and targets from the text file
+    training_data, training_targets = model.generate_training_data("test.txt")
+
+    # Train the model
+    model.train(epochs=5, data=training_data, targets=training_targets)
 
     while True:
         user_input = input("You: ")
