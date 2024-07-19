@@ -1,4 +1,4 @@
-# Large Language Model v6.6 - George W
+# Large Language Model v6.7 - George W
 import numpy as np
 import pickle
 import re
