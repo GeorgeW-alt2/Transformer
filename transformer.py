@@ -1,4 +1,4 @@
-# Large Language Model v7.1 - George W
+# Large Language Model v7.2 - George W
 
 import numpy as np
 import pickle
@@ -131,10 +131,6 @@ class LanguageModel:
         self.save_word_dict(self.word_to_idx, "langA.dat")
         self.save_word_dict(self.idx_to_word, "langB.dat")
 
-        linear_space_array = np.linspace(-1, 1, self.D * len(self.word_to_idx))  # Adjust the range as needed
-        self.W = linear_space_array.reshape(self.D, len(self.word_to_idx))
-        self.b = np.linspace(0, 2 * np.pi, self.D)
-
         # Initialize and update Fenwick Tree with n-gram counts
         self.initialize_fenwick_tree(len(self.word_to_idx))
         for idx in range(1, len(self.word_to_idx) + 1):
@@ -164,6 +160,9 @@ if __name__ == "__main__":
         model.word_to_idx = model.load_word_dict("langA.dat")
         model.idx_to_word = model.load_word_dict("langB.dat")
 
+    linear_space_array = np.linspace(-1, 1, model.D * len(model.word_to_idx))  # Adjust the range as needed
+    model.W = linear_space_array.reshape(model.D, len(model.word_to_idx))
+    model.b = np.linspace(0, 2 * np.pi, model.D)
     while True:
         user_input = input("You: ")
         response = model.chat(user_input)
