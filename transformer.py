@@ -1,10 +1,10 @@
-# Large Language Model v6.4 - George W
+# Large Language Model v6.5 - George W
 
 import numpy as np
 import pickle
 import re
 
-KB_memory_uncompressed = 1000  # KB access, -1 for unlimited
+KB_memory_uncompressed = 100  # KB access, -1 for unlimited
 generate_length = 100
 padding_token = '<unk>'
 
@@ -55,12 +55,13 @@ class LanguageModel:
         # Backward pass (Gradient placeholders)
         gradients = np.random.randn(*self.W.shape)  # Replace with actual gradient computation
         self.W -= self.learning_rate * gradients
-
+        return predictions
     def train(self, epochs, data, targets):
+        target = targets[0]
         for epoch in range(epochs):
             total_loss = 0
-            for input_seq, target in zip(data, targets):
-                self.train_step(input_seq, target)
+            for input_seq in data:
+                target = self.train_step(input_seq, target)
 
             print(f"Epoch {epoch + 1}/{epochs}")
 
