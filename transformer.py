@@ -1,4 +1,5 @@
-# Large Language Model v6.71 - George W
+# Large Language Model v6.8 - George W
+
 import numpy as np
 import pickle
 import re
@@ -34,10 +35,18 @@ class LanguageModel:
                 encoded[idx - 1] = 1
         return encoded
 
-    def rgf_mapping(self, input_vec):
+    def tbi_mapping(self, input_vec):
         z = np.dot(self.W, input_vec) + self.b
-        base_transformed = np.sqrt(2 / self.D) * np.concatenate((np.cos(z), np.sin(z)))
-        return base_transformed
+        tbi_transformed = np.zeros_like(z)
+
+        # Define triangular basis functions
+        for i in range(len(z)):
+            for j in range(self.D):
+                center = (j + 0.5) / self.D
+                width = 1.0 / self.D
+                tbi_transformed[i] += np.maximum(0, 1 - np.abs((z[i] - center) / width))
+
+        return tbi_transformed.flatten()
 
     def softmax(self, logits):
         exps = np.exp(logits - np.max(logits))  # Numerical stability
@@ -46,10 +55,10 @@ class LanguageModel:
     def chat(self, question):
         output = []
         input_seq = self.encode_sentence(question)
-        rgf_input = self.rgf_mapping(input_seq)
+        tbi_input = self.tbi_mapping(input_seq)
 
         for _ in range(generate_length):
-            probabilities = self.softmax(rgf_input.flatten())
+            probabilities = self.softmax(tbi_input.flatten())
 
             # Dynamic bias adjustment based on sentence length or context
             sentence_length = len(output) + 1
@@ -63,10 +72,9 @@ class LanguageModel:
 
             next_input = ' '.join(output)
             input_seq = self.encode_sentence(next_input)
-            rgf_input = self.rgf_mapping(input_seq)
+            tbi_input = self.tbi_mapping(input_seq)
 
         return ' '.join(output)
-
 
     def save_word_dict(self, word_dict, filename):
         with open(filename, 'wb') as f:
