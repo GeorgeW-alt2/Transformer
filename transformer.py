@@ -1,4 +1,4 @@
-# Large Language Model v7.0 - George W
+# Large Language Model v7.1 - George W
 
 import numpy as np
 import pickle
@@ -145,7 +145,7 @@ class LanguageModel:
 
     def update_ngram_counts(self, ngram_idx, delta):
         if self.fenwick_tree:
-            self.fenwick_tree.update(ngram_idx, delta)
+            self.fenwick_tree.update(delta,ngram_idx)
 
     def query_ngram_count(self, ngram_idx):
         if self.fenwick_tree:
