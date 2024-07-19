@@ -1,4 +1,4 @@
-# Large Language Model v6.91 - George W
+# Large Language Model v7.0 - George W
 
 import numpy as np
 import pickle
@@ -7,6 +7,26 @@ import re
 KB_memory_uncompressed = -1  # KB access, -1 for unlimited
 generate_length = 100
 padding_token = '<unk>'
+
+class FenwickTree:
+    def __init__(self, size):
+        self.size = size
+        self.tree = [0] * (size + 1)
+
+    def update(self, index, delta):
+        while index <= self.size:
+            self.tree[index] += delta
+            index += index & -index
+
+    def query(self, index):
+        total = 0
+        while index > 0:
+            total += self.tree[index]
+            index -= index & -index
+        return total
+
+    def range_query(self, left, right):
+        return self.query(right) - self.query(left - 1)
 
 class LanguageModel:
     def __init__(self, n=3, D=200, learning_rate=0.01):
@@ -17,6 +37,9 @@ class LanguageModel:
         self.idx_to_word = {}
         self.W = None
         self.b = None
+        self.cells = np.random.randn(D, D)  # Added cells for RFF
+        self.alpha = 0.5  # Multinomial emission parameter
+        self.fenwick_tree = None  # Fenwick Tree for managing n-gram counts
 
     def create_ngrams(self, text):
         words = text.split()
@@ -24,7 +47,7 @@ class LanguageModel:
         return [' '.join(ngram) for ngram in ngrams]
 
     def is_valid_ngram(self, ngram):
-        return re.match("^[a-zA-Z0-9\s.,]*$", ngram) is not None
+        return re.match("^[a-zA-Z\s,]*$", ngram) is not None
 
     def encode_sentence(self, sentence):
         encoded = np.zeros(len(self.word_to_idx))
@@ -35,18 +58,17 @@ class LanguageModel:
                 encoded[idx - 1] = 1
         return encoded
 
-    def tbi_mapping(self, input_vec):
+    def hsa_mapping(self, input_vec):
         z = np.dot(self.W, input_vec) + self.b
-        tbi_transformed = np.zeros_like(z)
+        hsa_transformed = np.zeros_like(z)
 
-        # Define triangular basis functions
+        # Hierarchical Softmax Activation with Fenwick Tree adjustment
         for i in range(len(z)):
-            for j in range(self.D):
-                center = (j + 0.5) / self.D
-                width = 1.0 / self.D
-                tbi_transformed[i] += np.maximum(0, 1 - np.abs((z[i] - center) / width))
+            ngram_idx = i + 1
+            ngram_count = self.query_ngram_count(ngram_idx)  # Get n-gram count from Fenwick Tree
+            hsa_transformed[i] = np.log(1 + np.exp(z[i] - self.alpha * ngram_count))  # Adjust activation based on count
 
-        return tbi_transformed.flatten()
+        return hsa_transformed.flatten()
 
     def softmax(self, logits):
         exps = np.exp(logits - np.max(logits))  # Numerical stability
@@ -55,23 +77,26 @@ class LanguageModel:
     def chat(self, question):
         output = []
         input_seq = self.encode_sentence(question)
-        tbi_input = self.tbi_mapping(input_seq)
+        hsa_input = self.hsa_mapping(input_seq)
 
         for _ in range(generate_length):
-            probabilities = self.softmax(tbi_input.flatten())
+            probabilities = self.softmax(hsa_input.flatten())
 
-            # Dynamic bias adjustment based on sentence length or context
-            sentence_length = len(output) + 1
-            context_bias = np.exp(-0.1 * np.arange(len(probabilities)))  # Example bias decay
-            biased_probabilities = probabilities * context_bias
-            biased_probabilities /= biased_probabilities.sum()  # Normalize
+            # Adjust probabilities using Fenwick Tree
+            adjusted_probabilities = np.copy(probabilities)
+            for i in range(len(probabilities)):
+                ngram_idx = i + 1
+                ngram_count = self.query_ngram_count(ngram_idx)
+                adjusted_probabilities[i] = probabilities[i] * (1 + ngram_count / 10.0)  # Example adjustment
 
-            predicted_idx = np.random.choice(len(biased_probabilities), p=biased_probabilities)
+            adjusted_probabilities /= adjusted_probabilities.sum()  # Normalize adjusted probabilities
+
+            predicted_idx = np.random.choice(len(adjusted_probabilities), p=adjusted_probabilities)
             word = self.idx_to_word.get(predicted_idx + 1, padding_token)
             output.append(word)
 
             input_seq = self.encode_sentence(word)
-            tbi_input = self.tbi_mapping(input_seq)
+            hsa_input = self.hsa_mapping(input_seq)
 
         return ' '.join(output)
 
@@ -91,6 +116,8 @@ class LanguageModel:
             conversations = f.read().lower().split(".")[:KB_memory_uncompressed]
 
         vocab = set()
+        ngram_indices = []
+
         for conv in conversations:
             ngrams = self.create_ngrams(conv)
             for ngram in ngrams:
@@ -107,6 +134,23 @@ class LanguageModel:
         linear_space_array = np.linspace(-1, 1, self.D * len(self.word_to_idx))  # Adjust the range as needed
         self.W = linear_space_array.reshape(self.D, len(self.word_to_idx))
         self.b = np.linspace(0, 2 * np.pi, self.D)
+
+        # Initialize and update Fenwick Tree with n-gram counts
+        self.initialize_fenwick_tree(len(self.word_to_idx))
+        for idx in range(1, len(self.word_to_idx) + 1):
+            self.update_ngram_counts(idx, 1)  # Example update with count 1
+
+    def initialize_fenwick_tree(self, size):
+        self.fenwick_tree = FenwickTree(size)
+
+    def update_ngram_counts(self, ngram_idx, delta):
+        if self.fenwick_tree:
+            self.fenwick_tree.update(ngram_idx, delta)
+
+    def query_ngram_count(self, ngram_idx):
+        if self.fenwick_tree:
+            return self.fenwick_tree.query(ngram_idx)
+        return 0
 
 if __name__ == "__main__":
     model = LanguageModel()
