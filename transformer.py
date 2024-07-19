@@ -1,10 +1,9 @@
-# Large Language Model v6.5 - George W
-
+# Large Language Model v6.6 - George W
 import numpy as np
 import pickle
 import re
 
-KB_memory_uncompressed = 100  # KB access, -1 for unlimited
+KB_memory_uncompressed = -1  # KB access, -1 for unlimited
 generate_length = 100
 padding_token = '<unk>'
 
@@ -17,7 +16,6 @@ class LanguageModel:
         self.idx_to_word = {}
         self.W = None
         self.b = None
-        self.cell_weights = None
 
     def create_ngrams(self, text):
         words = text.split()
@@ -31,10 +29,9 @@ class LanguageModel:
         encoded = np.zeros(len(self.word_to_idx))
         ngrams = self.create_ngrams(sentence)
         for ngram in ngrams:
-            if ngram in self.word_to_idx:
-                encoded[self.word_to_idx[ngram] - 1] = 1
-            else:
-                encoded[self.word_to_idx[padding_token] - 1] = 1
+            idx = self.word_to_idx.get(ngram, self.word_to_idx.get(padding_token))
+            if idx is not None:
+                encoded[idx - 1] = 1
         return encoded
 
     def rgf_mapping(self, input_vec):
@@ -43,52 +40,33 @@ class LanguageModel:
         return base_transformed
 
     def softmax(self, logits):
-        exps = np.exp(logits - np.max(logits))  # Subtract max for numerical stability
+        exps = np.exp(logits - np.max(logits))  # Numerical stability
         return exps / np.sum(exps)
-
-    def train_step(self, input_seq, target):
-        # Forward pass
-        rgf_input = self.rgf_mapping(input_seq)
-        predictions = self.softmax(rgf_input.flatten())
-
-
-        # Backward pass (Gradient placeholders)
-        gradients = np.random.randn(*self.W.shape)  # Replace with actual gradient computation
-        self.W -= self.learning_rate * gradients
-        return predictions
-    def train(self, epochs, data, targets):
-        target = targets[0]
-        for epoch in range(epochs):
-            total_loss = 0
-            for input_seq in data:
-                target = self.train_step(input_seq, target)
-
-            print(f"Epoch {epoch + 1}/{epochs}")
 
     def chat(self, question):
         output = []
         input_seq = self.encode_sentence(question)
         rgf_input = self.rgf_mapping(input_seq)
 
-        for i in range(generate_length):
-            adjusted_probabilities = self.softmax(rgf_input.flatten())
+        for _ in range(generate_length):
+            probabilities = self.softmax(rgf_input.flatten())
 
-            # Invert the adjusted probabilities
-            inverted_probabilities = 1 / adjusted_probabilities
-            inverted_probabilities /= inverted_probabilities.sum()  # Normalize to ensure they sum to 1
+            # Dynamic bias adjustment based on sentence length or context
+            sentence_length = len(output) + 1
+            context_bias = np.exp(-0.1 * np.arange(len(probabilities)))  # Example bias decay
+            biased_probabilities = probabilities * context_bias
+            biased_probabilities /= biased_probabilities.sum()  # Normalize
 
-            rng = np.random.default_rng()
-            predicted_idx = rng.choice(range(len(inverted_probabilities)), p=inverted_probabilities)
-            if predicted_idx + 1 in self.idx_to_word:  # Adjust index to start from 0
-                output.append(self.idx_to_word[predicted_idx + 1])
-            else:
-                output.append(padding_token)
+            predicted_idx = np.random.choice(len(biased_probabilities), p=biased_probabilities)
+            word = self.idx_to_word.get(predicted_idx + 1, padding_token)
+            output.append(word)
 
             next_input = ' '.join(output)
             input_seq = self.encode_sentence(next_input)
             rgf_input = self.rgf_mapping(input_seq)
 
         return ' '.join(output)
+
 
     def save_word_dict(self, word_dict, filename):
         with open(filename, 'wb') as f:
@@ -100,17 +78,6 @@ class LanguageModel:
             word_dict = pickle.load(f)
         print(f"Dictionary loaded from {filename}")
         return word_dict
-
-    def save_rgf_params(self, filename):
-        with open(filename, 'wb') as f:
-            pickle.dump((self.W, self.b), f)
-        print(f"RGF parameters saved to {filename}")
-
-    def load_rgf_params(self, filename):
-        with open(filename, 'rb') as f:
-            self.W, self.b = pickle.load(f)
-        print(f"RGF parameters loaded from {filename}")
-        return self.W, self.b
 
     def preprocess_data(self, filename):
         with open(filename, encoding="UTF-8") as f:
@@ -132,9 +99,7 @@ class LanguageModel:
 
         linear_space_array = np.linspace(-1, 1, self.D * len(self.word_to_idx))  # Adjust the range as needed
         self.W = linear_space_array.reshape(self.D, len(self.word_to_idx))
-
         self.b = np.linspace(0, 2 * np.pi, self.D)
-        self.save_rgf_params("rgf_params.dat")
 
     def generate_training_data(self, filename):
         with open(filename, encoding="UTF-8") as f:
@@ -149,13 +114,12 @@ class LanguageModel:
         for sentence in sentences:
             ngrams = self.create_ngrams(sentence)
             encoded_input = self.encode_sentence(sentence)
-            encoded_target = np.zeros(len(self.word_to_idx))
+            encoded_target = np.zeros(len(self.word_to_idx)+2)
 
             for ngram in ngrams:
-                if ngram in self.word_to_idx:
-                    encoded_target[self.word_to_idx[ngram] - 1] = 1
-                else:
-                    encoded_target[self.word_to_idx[padding_token] - 1] = 1
+                idx = self.word_to_idx.get(ngram, self.word_to_idx.get(padding_token))
+                if idx is not None:
+                    encoded_target[idx + 1] = 1
 
             data.append(encoded_input)
             targets.append(encoded_target)
@@ -173,13 +137,6 @@ if __name__ == "__main__":
     if _choice_ == "l":
         model.word_to_idx = model.load_word_dict("langA.dat")
         model.idx_to_word = model.load_word_dict("langB.dat")
-        model.W, model.b = model.load_rgf_params("rgf_params.dat")
-
-    # Generate training data and targets from the text file
-    training_data, training_targets = model.generate_training_data("test.txt")
-
-    # Train the model
-    model.train(epochs=5, data=training_data, targets=training_targets)
 
     while True:
         user_input = input("You: ")
