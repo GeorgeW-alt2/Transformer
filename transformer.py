@@ -1,4 +1,4 @@
-# Large Language Model v6.9 - George W
+# Large Language Model v6.91 - George W
 
 import numpy as np
 import pickle
@@ -70,7 +70,7 @@ class LanguageModel:
             word = self.idx_to_word.get(predicted_idx + 1, padding_token)
             output.append(word)
 
-            input_seq = self.encode_sentence(next_input)
+            input_seq = self.encode_sentence(word)
             tbi_input = self.tbi_mapping(input_seq)
 
         return ' '.join(output)
