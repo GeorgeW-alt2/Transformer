@@ -1,4 +1,4 @@
-# Large Language Model v6.7 - George W
+# Large Language Model v6.71 - George W
 import numpy as np
 import pickle
 import re
@@ -100,31 +100,6 @@ class LanguageModel:
         linear_space_array = np.linspace(-1, 1, self.D * len(self.word_to_idx))  # Adjust the range as needed
         self.W = linear_space_array.reshape(self.D, len(self.word_to_idx))
         self.b = np.linspace(0, 2 * np.pi, self.D)
-
-    def generate_training_data(self, filename):
-        with open(filename, encoding="UTF-8") as f:
-            text = f.read().lower()
-
-        sentences = text.split(".")[:KB_memory_uncompressed]
-        sentences = [s.strip() for s in sentences if s.strip()]
-
-        data = []
-        targets = []
-
-        for sentence in sentences:
-            ngrams = self.create_ngrams(sentence)
-            encoded_input = self.encode_sentence(sentence)
-            encoded_target = np.zeros(len(self.word_to_idx)+2)
-
-            for ngram in ngrams:
-                idx = self.word_to_idx.get(ngram, self.word_to_idx.get(padding_token))
-                if idx is not None:
-                    encoded_target[idx + 1] = 1
-
-            data.append(encoded_input)
-            targets.append(encoded_target)
-
-        return data, targets
 
 if __name__ == "__main__":
     model = LanguageModel()
