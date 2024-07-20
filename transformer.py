@@ -1,5 +1,5 @@
 
-# Large Language Model v8.9 - George W
+# Large Language Model v9.0 - George W
 
 import numpy as np
 import pickle
@@ -17,6 +17,7 @@ class NgramProcessor:
     def get_partial_ngram_indices(self, ngram):
         words = ngram.split()  # Split ngram into individual words
         partial_ngrams = []
+        all_indices = []
 
         # Generate all possible contiguous sub-sequences (partial ngrams)
         for i in range(len(words)):
@@ -25,17 +26,16 @@ class NgramProcessor:
                 partial_ngrams.append(partial_ngram)
 
         # Convert words in each partial ngram to their indices
-        all_indices = []
-        for partial_ngram in partial_ngrams:
-            indices = []
-            for word in partial_ngram:
-                idx = self.word_to_idx.get(word, self.word_to_idx.get(self.padding_token))
-                if idx is not None:
-                    indices.append(idx)
-            if indices:
-                all_indices.append(indices)
+            for partial_ngram in partial_ngrams:
+                indices = []
+                for word in partial_ngram:
+                    idx = self.word_to_idx.get(word, self.word_to_idx.get(self.padding_token))
+                    if idx is not None:
+                        indices.append(idx)
+                if indices:
+                    all_indices.append(indices)
 
-        return all_indices
+            return all_indices
 
 class LanguageModel:
     def __init__(self, n=3, spill_factor=0.1):
@@ -88,15 +88,15 @@ class LanguageModel:
                     for idx in indices:
                         if 0 <= idx < num_indices:
                             if idx > 0:
-                                self.matrix[idx] -= self.matrix[:idx]
+                                self.matrix[idx] -= self.spill_factor
 
-            if i % 1000 == 0:
+            if i % 10000 == 0:
                 print("training:", i, "/", len(training_data))
-        print("training:", len(training_data), "/", len(training_data))
+        print("Training:", len(training_data), "/", len(training_data))
 
     def train(self, filename):
         with open(filename, encoding="UTF-8") as f:
-            training_data = f.read().lower().split()[:KB_memory_uncompressed]
+            training_data = self.create_ngrams(f.read().lower())[:KB_memory_uncompressed]
 
         # Compute spill matrix based on training data
         self.compute_matrix(training_data)
