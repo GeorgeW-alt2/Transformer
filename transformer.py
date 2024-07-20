@@ -1,6 +1,4 @@
-
-# Large Language Model v9.1 - George W
-
+# Large Language Model v9.2 - George W
 import numpy as np
 import pickle
 import re
@@ -26,14 +24,14 @@ class NgramProcessor:
                 partial_ngrams.append(partial_ngram)
 
         # Convert words in each partial ngram to their indices
-        for i, partial_ngram in enumerate(partial_ngrams):
+        for partial_ngram in partial_ngrams:
             indices = []
             for word in partial_ngram:
                 idx = self.word_to_idx.get(word, self.word_to_idx.get(self.padding_token))
                 if idx is not None:
                     indices.append(idx)
             if indices:
-                all_indices.append(i)
+                all_indices.append(indices)
 
         return all_indices
 
@@ -51,7 +49,7 @@ class LanguageModel:
         return [' '.join(ngram) for ngram in ngrams]
 
     def is_valid_ngram(self, ngram):
-        return re.match("^[a-zA-Z\s,]*$", ngram) is not None
+        return re.match("^[a-zA-Z\s]*$", ngram) is not None
 
     def encode_sentence(self, sentence):
         ngrams = self.create_ngrams(sentence)
@@ -61,8 +59,8 @@ class LanguageModel:
         for ngram in ngrams:
             partial_ngram_indices = processor.get_partial_ngram_indices(ngram)
             for indices in partial_ngram_indices:
-                if indices < len(encoded):
-                    encoded[indices] += 1
+                for idx in indices:
+                    encoded[idx] += 1
 
         encoded_sum = encoded.sum()
         if encoded_sum > 0:
@@ -75,7 +73,7 @@ class LanguageModel:
 
     def compute_matrix(self, training_data):
         num_indices = len(self.word_to_idx)
-        self.matrix = np.zeros((num_indices))
+        self.matrix = {i: {} for i in range(num_indices)}  # Using a dictionary for sparse representation
 
         # Compute the spill matrix based on training data
         for i, sentence in enumerate(training_data):
@@ -85,14 +83,28 @@ class LanguageModel:
                 partial_ngram_indices = processor.get_partial_ngram_indices(ngram)
                 for indices in partial_ngram_indices:
                     if indices:
-                        self.matrix += indices
+                        for idx in indices:
+                            if idx not in self.matrix:
+                                self.matrix[idx] = {}
+                            for index in indices:
+                                if index not in self.matrix[idx]:
+                                    self.matrix[idx][index] = 0
+                                self.matrix[idx][index] += 1  # Accumulate counts for indices
+
             if i % 10000 == 0:
                 print("Training:", i, "/", len(training_data))
         print("Training:", len(training_data), "/", len(training_data))
 
+        # Normalize the matrix row-wise
+        for row in self.matrix:
+            row_sum = sum(self.matrix[row].values())
+            if row_sum > 0:
+                for col in self.matrix[row]:
+                    self.matrix[row][col] /= row_sum
+
     def train(self, filename):
         with open(filename, encoding="UTF-8") as f:
-            training_data = self.create_ngrams(f.read().lower())[:KB_memory_uncompressed]
+            training_data = f.read().lower().split('.')[:KB_memory_uncompressed]
 
         # Compute spill matrix based on training data
         self.compute_matrix(training_data)
@@ -106,7 +118,11 @@ class LanguageModel:
             raise ValueError("Spill matrix is not computed. Please train the model first.")
 
         for t in range(generate_length):
-            spilled_probabilities = np.dot(self.matrix, probabilities) + probabilities
+            spilled_probabilities = np.zeros_like(probabilities)
+            for idx, prob in enumerate(probabilities):
+                if idx in self.matrix:
+                    for col, weight in self.matrix[idx].items():
+                        spilled_probabilities[col] += prob * weight
             spilled_probabilities = np.maximum(spilled_probabilities, 1e-8)  # Avoid division by zero
             spilled_probabilities /= spilled_probabilities.sum()
 
