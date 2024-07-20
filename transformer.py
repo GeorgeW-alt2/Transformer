@@ -1,10 +1,9 @@
-# Large Language Model v7.4 - George W
-
+# Large Language Model v8.0 - George W
 import numpy as np
 import pickle
 import re
 
-KB_memory_uncompressed = 1000  # KB access, -1 for unlimited
+KB_memory_uncompressed = -1  # KB access, -1 for unlimited
 generate_length = 100
 padding_token = '<unk>'
 
@@ -40,6 +39,7 @@ class LanguageModel:
         self.spill_factor = spill_factor
         self.word_to_idx = {}
         self.idx_to_word = {}
+        self.matrix = None
 
     def create_ngrams(self, text):
         words = text.split()
@@ -67,19 +67,44 @@ class LanguageModel:
         exps = np.exp(logits - np.max(logits))  # Numerical stability
         return exps / np.sum(exps)
 
+    def compute_matrix(self, training_data):
+        num_indices = len(self.word_to_idx)
+        self.matrix = np.zeros((num_indices))
+
+        # Compute the spill matrix based on training data
+        for i, sentence in enumerate(training_data):
+            ngrams = self.create_ngrams(sentence)
+            processor = NgramProcessor(self.word_to_idx, padding_token)
+            for ngram in ngrams:
+                partial_ngram_indices = processor.get_partial_ngram_indices(ngram)
+                for indices in partial_ngram_indices:
+                    for idx in indices:
+                        if idx > 0:
+                            self.matrix[idx - 1] += self.spill_factor
+                        if idx < num_indices - 1:
+                            self.matrix[idx + 1] += self.spill_factor
+            if i % 1000 == 0:
+                print("training:",i,"/",len(training_data))
+        print("training:",len(training_data),"/",len(training_data))
+
+    def train(self, filename):
+        with open(filename, encoding="UTF-8") as f:
+            training_data = f.read().lower().split(".")[:KB_memory_uncompressed]
+
+        # Compute spill matrix based on training data
+        self.compute_matrix(training_data)
+
     def chat(self, question):
         output = []
         input_seq = self.encode_sentence(question)
         probabilities = self.softmax(input_seq).flatten()
 
+        if self.matrix is None:
+            raise ValueError("Spill matrix is not computed. Please train the model first.")
+
         for t in range(generate_length):
-            # Apply probability spill
-            spilled_probabilities = probabilities.copy()
-            for idx in range(len(spilled_probabilities)):
-                if idx > 0:
-                    spilled_probabilities[idx:] += self.spill_factor * probabilities[idx]
-                if idx < len(spilled_probabilities) - 1:
-                    spilled_probabilities[:idx] += self.spill_factor * probabilities[idx]
+            # Apply precomputed spill probabilities
+            spilled_probabilities = np.dot(self.matrix, probabilities) + probabilities
 
             # Normalize to ensure the probabilities sum to 1
             spilled_probabilities /= spilled_probabilities.sum()
@@ -90,7 +115,7 @@ class LanguageModel:
             output.append(word)
 
             # Update input sequence and prediction
-            input_seq = self.encode_sentence(' '.join(output))
+            input_seq = self.encode_sentence(word)
             probabilities = self.softmax(input_seq)
 
         return ' '.join(output)
@@ -105,6 +130,24 @@ class LanguageModel:
             word_dict = pickle.load(f)
         print(f"Dictionary loaded from {filename}")
         return word_dict
+
+    def save_model(self, filename):
+        model_state = {
+            'word_to_idx': self.word_to_idx,
+            'idx_to_word': self.idx_to_word,
+            'matrix': self.matrix
+        }
+        with open(filename, 'wb') as f:
+            pickle.dump(model_state, f)
+        print(f"Model saved to {filename}")
+
+    def load_model(self, filename):
+        with open(filename, 'rb') as f:
+            model_state = pickle.load(f)
+        self.word_to_idx = model_state['word_to_idx']
+        self.idx_to_word = model_state['idx_to_word']
+        self.matrix = model_state['matrix']
+        print(f"Model loaded from {filename}")
 
     def preprocess_data(self, filename):
         with open(filename, encoding="UTF-8") as f:
@@ -132,10 +175,11 @@ if __name__ == "__main__":
 
     if _choice_ == "s":
         model.preprocess_data("test.txt")
+        model.train("test.txt")
+        model.save_model("model.dat")
 
-    if _choice_ == "l":
-        model.word_to_idx = model.load_word_dict("langA.dat")
-        model.idx_to_word = model.load_word_dict("langB.dat")
+    elif _choice_ == "l":
+        model.load_model("model.dat")
 
     while True:
         user_input = input("You: ")
