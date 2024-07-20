@@ -1,4 +1,4 @@
-# Large Language Model v8.7 - George W
+# Large Language Model v8.8 - George W
 
 import numpy as np
 import pickle
@@ -87,9 +87,8 @@ class LanguageModel:
                     for idx in indices:
                         if 0 <= idx < num_indices:
                             if idx > 0:
-                                self.matrix[:idx] -= self.spill_factor
-                            if idx < num_indices - 1:
-                                self.matrix[idx:] -= self.spill_factor
+                                self.matrix[idx] -= self.spill_factor
+
             if i % 1000 == 0:
                 print("training:", i, "/", len(training_data))
         print("training:", len(training_data), "/", len(training_data))
