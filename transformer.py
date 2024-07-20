@@ -1,9 +1,9 @@
-# Large Language Model v8.0 - George W
+# Large Language Model v8.1 - George W
 import numpy as np
 import pickle
 import re
 
-KB_memory_uncompressed = -1  # KB access, -1 for unlimited
+KB_memory_uncompressed = 10000  # KB access, -1 for unlimited
 generate_length = 100
 padding_token = '<unk>'
 
@@ -80,9 +80,9 @@ class LanguageModel:
                 for indices in partial_ngram_indices:
                     for idx in indices:
                         if idx > 0:
-                            self.matrix[idx - 1] += self.spill_factor
+                            self.matrix[:idx] += self.spill_factor
                         if idx < num_indices - 1:
-                            self.matrix[idx + 1] += self.spill_factor
+                            self.matrix[idx:] += self.spill_factor
             if i % 1000 == 0:
                 print("training:",i,"/",len(training_data))
         print("training:",len(training_data),"/",len(training_data))
