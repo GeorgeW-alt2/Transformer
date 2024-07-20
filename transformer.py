@@ -1,5 +1,5 @@
 
-# Large Language Model v9.0 - George W
+# Large Language Model v9.1 - George W
 
 import numpy as np
 import pickle
@@ -26,16 +26,16 @@ class NgramProcessor:
                 partial_ngrams.append(partial_ngram)
 
         # Convert words in each partial ngram to their indices
-            for partial_ngram in partial_ngrams:
-                indices = []
-                for word in partial_ngram:
-                    idx = self.word_to_idx.get(word, self.word_to_idx.get(self.padding_token))
-                    if idx is not None:
-                        indices.append(idx)
-                if indices:
-                    all_indices.append(indices)
+        for i, partial_ngram in enumerate(partial_ngrams):
+            indices = []
+            for word in partial_ngram:
+                idx = self.word_to_idx.get(word, self.word_to_idx.get(self.padding_token))
+                if idx is not None:
+                    indices.append(idx)
+            if indices:
+                all_indices.append(i)
 
-            return all_indices
+        return all_indices
 
 class LanguageModel:
     def __init__(self, n=3, spill_factor=0.1):
@@ -61,9 +61,8 @@ class LanguageModel:
         for ngram in ngrams:
             partial_ngram_indices = processor.get_partial_ngram_indices(ngram)
             for indices in partial_ngram_indices:
-                for idx in indices:
-                    if idx < len(encoded):
-                        encoded[idx] += 1
+                if indices < len(encoded):
+                    encoded[indices] += 1
 
         encoded_sum = encoded.sum()
         if encoded_sum > 0:
@@ -85,13 +84,10 @@ class LanguageModel:
             for ngram in ngrams:
                 partial_ngram_indices = processor.get_partial_ngram_indices(ngram)
                 for indices in partial_ngram_indices:
-                    for idx in indices:
-                        if 0 <= idx < num_indices:
-                            if idx > 0:
-                                self.matrix[idx] -= self.spill_factor
-
+                    if indices:
+                        self.matrix += indices
             if i % 10000 == 0:
-                print("training:", i, "/", len(training_data))
+                print("Training:", i, "/", len(training_data))
         print("Training:", len(training_data), "/", len(training_data))
 
     def train(self, filename):
