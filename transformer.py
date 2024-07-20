@@ -1,4 +1,4 @@
-# Large Language Model v8.6 - George W
+# Large Language Model v8.7 - George W
 
 import numpy as np
 import pickle
@@ -115,7 +115,7 @@ class LanguageModel:
             spilled_probabilities /= spilled_probabilities.sum()
 
             predicted_idx = np.random.choice(len(spilled_probabilities), p=spilled_probabilities)
-            word = self.idx_to_word.get(predicted_idx + 1, padding_token)
+            word = self.idx_to_word.get(predicted_idx, padding_token)
             output.append(word)
 
             input_seq = self.encode_sentence(word)  # Update input sequence based on generated words
