@@ -1,4 +1,4 @@
-# Large Language Model v8.5 - George W
+# Large Language Model v8.6 - George W
 
 import numpy as np
 import pickle
@@ -87,9 +87,9 @@ class LanguageModel:
                     for idx in indices:
                         if 0 <= idx < num_indices:
                             if idx > 0:
-                                self.matrix[:idx] += self.spill_factor
+                                self.matrix[:idx] -= self.spill_factor
                             if idx < num_indices - 1:
-                                self.matrix[idx:] += self.spill_factor
+                                self.matrix[idx:] -= self.spill_factor
             if i % 1000 == 0:
                 print("training:", i, "/", len(training_data))
         print("training:", len(training_data), "/", len(training_data))
@@ -118,7 +118,7 @@ class LanguageModel:
             word = self.idx_to_word.get(predicted_idx + 1, padding_token)
             output.append(word)
 
-            input_seq = self.encode_sentence(' '.join(output))  # Update input sequence based on generated words
+            input_seq = self.encode_sentence(word)  # Update input sequence based on generated words
             probabilities = self.softmax(input_seq)
 
         return ' '.join(output)
