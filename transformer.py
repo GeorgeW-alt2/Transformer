@@ -1,4 +1,5 @@
-# Large Language Model v8.2 - George W
+# Large Language Model v8.5 - George W
+
 import numpy as np
 import pickle
 import re
@@ -28,8 +29,10 @@ class NgramProcessor:
             indices = []
             for word in partial_ngram:
                 idx = self.word_to_idx.get(word, self.word_to_idx.get(self.padding_token))
-                indices.append(idx)
-            all_indices.append(indices)
+                if idx is not None:
+                    indices.append(idx)
+            if indices:
+                all_indices.append(indices)
 
         return all_indices
 
@@ -58,9 +61,12 @@ class LanguageModel:
             partial_ngram_indices = processor.get_partial_ngram_indices(ngram)
             for indices in partial_ngram_indices:
                 for idx in indices:
-                    encoded[idx] += 1
+                    if idx < len(encoded):
+                        encoded[idx] += 1
 
-        encoded /= encoded.sum()  # Normalize the encoded array to ensure it sums to 1
+        encoded_sum = encoded.sum()
+        if encoded_sum > 0:
+            encoded /= encoded_sum  # Normalize the encoded array to ensure it sums to 1
         return encoded
 
     def softmax(self, logits):
@@ -79,13 +85,14 @@ class LanguageModel:
                 partial_ngram_indices = processor.get_partial_ngram_indices(ngram)
                 for indices in partial_ngram_indices:
                     for idx in indices:
-                        if idx > 0:
-                            self.matrix[:idx] += self.spill_factor
-                        if idx < num_indices - 1:
-                            self.matrix[idx:] += self.spill_factor
+                        if 0 <= idx < num_indices:
+                            if idx > 0:
+                                self.matrix[:idx] += self.spill_factor
+                            if idx < num_indices - 1:
+                                self.matrix[idx:] += self.spill_factor
             if i % 1000 == 0:
-                print("training:",i,"/",len(training_data))
-        print("training:",len(training_data),"/",len(training_data))
+                print("training:", i, "/", len(training_data))
+        print("training:", len(training_data), "/", len(training_data))
 
     def train(self, filename):
         with open(filename, encoding="UTF-8") as f:
@@ -103,19 +110,15 @@ class LanguageModel:
             raise ValueError("Spill matrix is not computed. Please train the model first.")
 
         for t in range(generate_length):
-            # Apply precomputed spill probabilities
             spilled_probabilities = np.dot(self.matrix, probabilities) + probabilities
-
-            # Normalize to ensure the probabilities sum to 1
+            spilled_probabilities = np.maximum(spilled_probabilities, 1e-8)  # Avoid division by zero
             spilled_probabilities /= spilled_probabilities.sum()
 
-            # Select the next word based on the adjusted probabilities
             predicted_idx = np.random.choice(len(spilled_probabilities), p=spilled_probabilities)
             word = self.idx_to_word.get(predicted_idx + 1, padding_token)
             output.append(word)
 
-            # Update input sequence and prediction
-            input_seq = self.encode_sentence(word)
+            input_seq = self.encode_sentence(' '.join(output))  # Update input sequence based on generated words
             probabilities = self.softmax(input_seq)
 
         return ' '.join(output)
