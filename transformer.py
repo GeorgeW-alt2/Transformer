@@ -1,9 +1,9 @@
-# Large Language Model v8.1 - George W
+# Large Language Model v8.2 - George W
 import numpy as np
 import pickle
 import re
 
-KB_memory_uncompressed = 10000  # KB access, -1 for unlimited
+KB_memory_uncompressed = -1  # KB access, -1 for unlimited
 generate_length = 100
 padding_token = '<unk>'
 
