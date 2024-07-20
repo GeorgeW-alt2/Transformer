@@ -1,4 +1,5 @@
-# Large Language Model v8.8 - George W
+
+# Large Language Model v8.9 - George W
 
 import numpy as np
 import pickle
@@ -87,7 +88,7 @@ class LanguageModel:
                     for idx in indices:
                         if 0 <= idx < num_indices:
                             if idx > 0:
-                                self.matrix[idx] -= self.spill_factor
+                                self.matrix[idx] -= self.matrix[:idx]
 
             if i % 1000 == 0:
                 print("training:", i, "/", len(training_data))
@@ -95,7 +96,7 @@ class LanguageModel:
 
     def train(self, filename):
         with open(filename, encoding="UTF-8") as f:
-            training_data = f.read().lower().split(".")[:KB_memory_uncompressed]
+            training_data = f.read().lower().split()[:KB_memory_uncompressed]
 
         # Compute spill matrix based on training data
         self.compute_matrix(training_data)
