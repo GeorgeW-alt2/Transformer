@@ -1,5 +1,4 @@
-
-# Large Language Model v9.5
+# Large Language Model v10.0
 import numpy as np
 import pickle
 import re
@@ -34,36 +33,26 @@ def encode_sentence(sentence, word_to_idx, n):
             encoded[word_to_idx[padding_token] - 1] = 0
     return encoded
 
-# Random Fourier Features transformation
-def rff_mapping(input_vec, W, b):
-    return np.sqrt(2 / D) * np.tanh(np.dot(W, input_vec) + b)
-
 def softmax(logits):
     exps = np.exp(logits - (np.max(logits)*generate_length))  # Subtract max*generate_length for numerical stability and attention
     return exps / np.sum(exps)
 
-def chat(question, word_to_idx, generate_length, n, W, b):
+def chat(question, word_to_idx, generate_length, n):
     output = []
     input_seq = encode_sentence(question, word_to_idx, n)
-    rff_input = rff_mapping(input_seq, W, b)
 
     for i in range(generate_length):
-        adjusted_probabilities = softmax(rff_input.flatten())
-
-        # Invert the adjusted probabilities
-        inverted_probabilities = 1 / adjusted_probabilities
-        inverted_probabilities /= inverted_probabilities.sum()  # Normalize to ensure they sum to 1
+        adjusted_probabilities = softmax(input_seq.flatten())
 
         rng = np.random.default_rng()
-        predicted_idx = rng.choice(range(len(inverted_probabilities)), p=inverted_probabilities)
+        predicted_idx = rng.choice(range(len(adjusted_probabilities)), p=adjusted_probabilities)
         if predicted_idx + 1 in idx_to_word:  # Adjust index to start from 0
-            output.append(idx_to_word[predicted_idx + 1])
+            output.append(idx_to_word[predicted_idx])
         else:
             output.append(padding_token)
 
         next_input = ' '.join(output)
         input_seq = encode_sentence(next_input, word_to_idx, n)
-        rff_input = rff_mapping(input_seq, W, b)
 
     return ' '.join(output)
 
@@ -79,45 +68,6 @@ def load_word_dict(filename):
         word_dict = pickle.load(f)
     print(f"Dictionary loaded from {filename}")
     return word_dict
-
-# Function to save RFF parameters to a file
-def save_rff_params(W, b, filename):
-    with open(filename, 'wb') as f:
-        pickle.dump((W, b), f)
-    print(f"RFF parameters saved to {filename}")
-
-# Function to load RFF parameters from a file
-def load_rff_params(filename):
-    with open(filename, 'rb') as f:
-        W, b = pickle.load(f)
-    print(f"RFF parameters loaded from {filename}")
-    return W, b
-
-def train_rff(sentences, word_to_idx, n, W, b, learning_rate, epochs):
-    for epoch in range(epochs):
-        total_loss = 0
-        for sentence in sentences:
-            input_seq = softmax(encode_sentence(sentence, word_to_idx, n))
-            rff_input = rff_mapping(input_seq, W, b)
-            target_seq = encode_sentence(sentence, word_to_idx, n)
-
-            # Ensure target_seq has the same shape as rff_input
-            if target_seq.shape != rff_input.shape:
-                target_seq = target_seq[:rff_input.shape[0]]
-
-            # Calculate error
-            error = rff_input - target_seq
-
-            # Update weights and biases
-            W -= learning_rate * np.outer(error, input_seq)
-            b -= learning_rate * error
-
-            # Calculate loss (Mean Squared Error)
-            loss = np.mean(error ** 2)
-            total_loss += loss
-
-        avg_loss = total_loss / len(sentences)
-        print(f'Epoch {epoch+1}/{epochs}, Loss: {avg_loss:.4f}')
 
 _choice_ = input("\nSave new model/Load old model?[s/l]:").lower()
 
@@ -145,21 +95,12 @@ if _choice_ == "s":
     save_word_dict(word_to_idx, "langA.dat")
     save_word_dict(idx_to_word, "langB.dat")
 
-    # Initialize model parameters
-    W = np.random.randn(D, len(word_to_idx)) * 0.01
-    b = np.random.uniform(0, 2 * np.pi, D)
-
-    # Train the model
-    train_rff(conversations, word_to_idx, n, W, b, learning_rate, epochs)
-    save_rff_params(W, b, "rff_params.dat")  # Save trained parameters
-
 if _choice_ == "l":
     word_to_idx = load_word_dict("langA.dat")
     idx_to_word = load_word_dict("langB.dat")
-    W, b = load_rff_params("rff_params.dat")
 
 # Example usage
 while True:
     user_input = input("You: ")
-    response = chat(user_input, word_to_idx, generate_length, n, W, b)
+    response = chat(user_input, word_to_idx, generate_length, n)
     print(f"AI: {response}")
