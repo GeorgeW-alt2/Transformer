@@ -1,202 +1,165 @@
-# Large Language Model v9.2 - George W
+
+# Large Language Model v9.5
 import numpy as np
 import pickle
 import re
 
-KB_memory_uncompressed = -1  # KB access, -1 for unlimited
+# Model parameters
+KB_memory_uncompressed = 100 # KB access, -1 for unlimited
 generate_length = 100
+epochs = 10
+n = 3
+D = 200  # Dimensionality of the RFF mapping
+learning_rate = 0.01  # Learning rate for training
 padding_token = '<unk>'
 
-class NgramProcessor:
-    def __init__(self, word_to_idx, padding_token):
-        self.word_to_idx = word_to_idx
-        self.padding_token = padding_token
+# Create n-grams and filter out n-grams with symbols
+def create_ngrams(text, n):
+    words = text.split()
+    ngrams = zip(*[words[i:] for i in range(n)])
+    return [' '.join(ngram) for ngram in ngrams]
 
-    def get_partial_ngram_indices(self, ngram):
-        words = ngram.split()  # Split ngram into individual words
-        partial_ngrams = []
-        all_indices = []
+# Check if an n-gram contains only alphanumeric characters and spaces
+def is_valid_ngram(ngram):
+    return re.match("^[a-zA-Z0-9\s.]*$", ngram) is not None
 
-        # Generate all possible contiguous sub-sequences (partial ngrams)
-        for i in range(len(words)):
-            for j in range(i + 1, len(words) + 1):
-                partial_ngram = words[i:j]
-                partial_ngrams.append(partial_ngram)
+# Encoding function with <unk> token handling
+def encode_sentence(sentence, word_to_idx, n):
+    encoded = np.zeros(len(word_to_idx))
+    ngrams = create_ngrams(sentence, n)
+    for ngram in ngrams:
+        if ngram in word_to_idx:
+            encoded[word_to_idx[ngram] - 1] = 1
+        else:
+            encoded[word_to_idx[padding_token] - 1] = 0
+    return encoded
 
-        # Convert words in each partial ngram to their indices
-        for partial_ngram in partial_ngrams:
-            indices = []
-            for word in partial_ngram:
-                idx = self.word_to_idx.get(word, self.word_to_idx.get(self.padding_token))
-                if idx is not None:
-                    indices.append(idx)
-            if indices:
-                all_indices.append(indices)
+# Random Fourier Features transformation
+def rff_mapping(input_vec, W, b):
+    return np.sqrt(2 / D) * np.tanh(np.dot(W, input_vec) + b)
 
-        return all_indices
+def softmax(logits):
+    exps = np.exp(logits - (np.max(logits)*generate_length))  # Subtract max*generate_length for numerical stability and attention
+    return exps / np.sum(exps)
 
-class LanguageModel:
-    def __init__(self, n=3, spill_factor=0.1):
-        self.n = n
-        self.spill_factor = spill_factor
-        self.word_to_idx = {}
-        self.idx_to_word = {}
-        self.matrix = None
+def chat(question, word_to_idx, generate_length, n, W, b):
+    output = []
+    input_seq = encode_sentence(question, word_to_idx, n)
+    rff_input = rff_mapping(input_seq, W, b)
 
-    def create_ngrams(self, text):
-        words = text.split()
-        ngrams = zip(*[words[i:] for i in range(self.n)])
-        return [' '.join(ngram) for ngram in ngrams]
+    for i in range(generate_length):
+        adjusted_probabilities = softmax(rff_input.flatten())
 
-    def is_valid_ngram(self, ngram):
-        return re.match("^[a-zA-Z\s]*$", ngram) is not None
+        # Invert the adjusted probabilities
+        inverted_probabilities = 1 / adjusted_probabilities
+        inverted_probabilities /= inverted_probabilities.sum()  # Normalize to ensure they sum to 1
 
-    def encode_sentence(self, sentence):
-        ngrams = self.create_ngrams(sentence)
-        encoded = np.zeros(len(self.word_to_idx))
-        processor = NgramProcessor(self.word_to_idx, padding_token)
+        rng = np.random.default_rng()
+        predicted_idx = rng.choice(range(len(inverted_probabilities)), p=inverted_probabilities)
+        if predicted_idx + 1 in idx_to_word:  # Adjust index to start from 0
+            output.append(idx_to_word[predicted_idx + 1])
+        else:
+            output.append(padding_token)
 
+        next_input = ' '.join(output)
+        input_seq = encode_sentence(next_input, word_to_idx, n)
+        rff_input = rff_mapping(input_seq, W, b)
+
+    return ' '.join(output)
+
+# Function to save word_dict from a file
+def save_word_dict(word_dict, filename):
+    with open(filename, 'wb') as f:
+        pickle.dump(word_dict, f)
+    print(f"Dictionary saved to {filename}")
+
+# Function to load word_dict from a file
+def load_word_dict(filename):
+    with open(filename, 'rb') as f:
+        word_dict = pickle.load(f)
+    print(f"Dictionary loaded from {filename}")
+    return word_dict
+
+# Function to save RFF parameters to a file
+def save_rff_params(W, b, filename):
+    with open(filename, 'wb') as f:
+        pickle.dump((W, b), f)
+    print(f"RFF parameters saved to {filename}")
+
+# Function to load RFF parameters from a file
+def load_rff_params(filename):
+    with open(filename, 'rb') as f:
+        W, b = pickle.load(f)
+    print(f"RFF parameters loaded from {filename}")
+    return W, b
+
+def train_rff(sentences, word_to_idx, n, W, b, learning_rate, epochs):
+    for epoch in range(epochs):
+        total_loss = 0
+        for sentence in sentences:
+            input_seq = softmax(encode_sentence(sentence, word_to_idx, n))
+            rff_input = rff_mapping(input_seq, W, b)
+            target_seq = encode_sentence(sentence, word_to_idx, n)
+
+            # Ensure target_seq has the same shape as rff_input
+            if target_seq.shape != rff_input.shape:
+                target_seq = target_seq[:rff_input.shape[0]]
+
+            # Calculate error
+            error = rff_input - target_seq
+
+            # Update weights and biases
+            W -= learning_rate * np.outer(error, input_seq)
+            b -= learning_rate * error
+
+            # Calculate loss (Mean Squared Error)
+            loss = np.mean(error ** 2)
+            total_loss += loss
+
+        avg_loss = total_loss / len(sentences)
+        print(f'Epoch {epoch+1}/{epochs}, Loss: {avg_loss:.4f}')
+
+_choice_ = input("\nSave new model/Load old model?[s/l]:").lower()
+
+word_to_idx = {}
+idx_to_word = {}
+if _choice_ == "s":
+    # Load and preprocess data
+    with open("test.txt", encoding="UTF-8") as f:
+        conversations = f.read().lower().split(".")[:KB_memory_uncompressed]
+
+    # Vocabulary creation
+    vocab = set()
+    for conv in conversations:
+        ngrams = create_ngrams(conv, n)
         for ngram in ngrams:
-            partial_ngram_indices = processor.get_partial_ngram_indices(ngram)
-            for indices in partial_ngram_indices:
-                for idx in indices:
-                    encoded[idx] += 1
+            if is_valid_ngram(ngram):
+                vocab.add(ngram)
 
-        encoded_sum = encoded.sum()
-        if encoded_sum > 0:
-            encoded /= encoded_sum  # Normalize the encoded array to ensure it sums to 1
-        return encoded
+    # Add a special token for unknown words
+    vocab.add(padding_token)
 
-    def softmax(self, logits):
-        exps = np.exp(logits - np.max(logits))  # Numerical stability
-        return exps / np.sum(exps)
+    # Process word dictionary
+    word_to_idx = {word: idx for idx, word in enumerate(vocab, start=1)}  # Start indexing from 1
+    idx_to_word = {idx: word for word, idx in word_to_idx.items()}
+    save_word_dict(word_to_idx, "langA.dat")
+    save_word_dict(idx_to_word, "langB.dat")
 
-    def compute_matrix(self, training_data):
-        num_indices = len(self.word_to_idx)
-        self.matrix = {i: {} for i in range(num_indices)}  # Using a dictionary for sparse representation
+    # Initialize model parameters
+    W = np.random.randn(D, len(word_to_idx)) * 0.01
+    b = np.random.uniform(0, 2 * np.pi, D)
 
-        # Compute the spill matrix based on training data
-        for i, sentence in enumerate(training_data):
-            ngrams = self.create_ngrams(sentence)
-            processor = NgramProcessor(self.word_to_idx, padding_token)
-            for ngram in ngrams:
-                partial_ngram_indices = processor.get_partial_ngram_indices(ngram)
-                for indices in partial_ngram_indices:
-                    if indices:
-                        for idx in indices:
-                            if idx not in self.matrix:
-                                self.matrix[idx] = {}
-                            for index in indices:
-                                if index not in self.matrix[idx]:
-                                    self.matrix[idx][index] = 0
-                                self.matrix[idx][index] += 1  # Accumulate counts for indices
+    # Train the model
+    train_rff(conversations, word_to_idx, n, W, b, learning_rate, epochs)
+    save_rff_params(W, b, "rff_params.dat")  # Save trained parameters
 
-            if i % 10000 == 0:
-                print("Training:", i, "/", len(training_data))
-        print("Training:", len(training_data), "/", len(training_data))
+if _choice_ == "l":
+    word_to_idx = load_word_dict("langA.dat")
+    idx_to_word = load_word_dict("langB.dat")
+    W, b = load_rff_params("rff_params.dat")
 
-        # Normalize the matrix row-wise
-        for row in self.matrix:
-            row_sum = sum(self.matrix[row].values())
-            if row_sum > 0:
-                for col in self.matrix[row]:
-                    self.matrix[row][col] /= row_sum
-
-    def train(self, filename):
-        with open(filename, encoding="UTF-8") as f:
-            training_data = f.read().lower().split('.')[:KB_memory_uncompressed]
-
-        # Compute spill matrix based on training data
-        self.compute_matrix(training_data)
-
-    def chat(self, question):
-        output = []
-        input_seq = self.encode_sentence(question)
-        probabilities = self.softmax(input_seq).flatten()
-
-        if self.matrix is None:
-            raise ValueError("Spill matrix is not computed. Please train the model first.")
-
-        for t in range(generate_length):
-            spilled_probabilities = np.zeros_like(probabilities)
-            for idx, prob in enumerate(probabilities):
-                if idx in self.matrix:
-                    for col, weight in self.matrix[idx].items():
-                        spilled_probabilities[col] += prob * weight
-            spilled_probabilities = np.maximum(spilled_probabilities, 1e-8)  # Avoid division by zero
-            spilled_probabilities /= spilled_probabilities.sum()
-
-            predicted_idx = np.random.choice(len(spilled_probabilities), p=spilled_probabilities)
-            word = self.idx_to_word.get(predicted_idx, padding_token)
-            output.append(word)
-
-            input_seq = self.encode_sentence(word)  # Update input sequence based on generated words
-            probabilities = self.softmax(input_seq)
-
-        return ' '.join(output)
-
-    def save_word_dict(self, word_dict, filename):
-        with open(filename, 'wb') as f:
-            pickle.dump(word_dict, f)
-        print(f"Dictionary saved to {filename}")
-
-    def load_word_dict(self, filename):
-        with open(filename, 'rb') as f:
-            word_dict = pickle.load(f)
-        print(f"Dictionary loaded from {filename}")
-        return word_dict
-
-    def save_model(self, filename):
-        model_state = {
-            'word_to_idx': self.word_to_idx,
-            'idx_to_word': self.idx_to_word,
-            'matrix': self.matrix
-        }
-        with open(filename, 'wb') as f:
-            pickle.dump(model_state, f)
-        print(f"Model saved to {filename}")
-
-    def load_model(self, filename):
-        with open(filename, 'rb') as f:
-            model_state = pickle.load(f)
-        self.word_to_idx = model_state['word_to_idx']
-        self.idx_to_word = model_state['idx_to_word']
-        self.matrix = model_state['matrix']
-        print(f"Model loaded from {filename}")
-
-    def preprocess_data(self, filename):
-        with open(filename, encoding="UTF-8") as f:
-            conversations = f.read().lower().split(".")[:KB_memory_uncompressed]
-
-        vocab = set()
-
-        for conv in conversations:
-            ngrams = self.create_ngrams(conv)
-            for ngram in ngrams:
-                if self.is_valid_ngram(ngram):
-                    vocab.add(ngram)
-
-        vocab.add(padding_token)
-
-        self.word_to_idx = {word: idx for idx, word in enumerate(vocab, start=1)}
-        self.idx_to_word = {idx: word for word, idx in self.word_to_idx.items()}
-        self.save_word_dict(self.word_to_idx, "langA.dat")
-        self.save_word_dict(self.idx_to_word, "langB.dat")
-
-if __name__ == "__main__":
-    model = LanguageModel()
-
-    _choice_ = input("\nSave new model/Load old model?[s/l]:").lower()
-
-    if _choice_ == "s":
-        model.preprocess_data("test.txt")
-        model.train("test.txt")
-        model.save_model("model.dat")
-
-    elif _choice_ == "l":
-        model.load_model("model.dat")
-
-    while True:
-        user_input = input("You: ")
-        response = model.chat(user_input)
-        print(f"AI: {response}")
+# Example usage
+while True:
+    user_input = input("You: ")
+    response = chat(user_input, word_to_idx, generate_length, n, W, b)
+    print(f"AI: {response}")
