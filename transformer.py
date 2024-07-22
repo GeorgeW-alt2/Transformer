@@ -1,4 +1,5 @@
-# Large Language Model v10.1
+# Large Language Model v10.2
+
 import numpy as np
 import pickle
 import re
@@ -10,19 +11,21 @@ n = 3
 padding_token = '<unk>'
 
 # Create n-grams and filter out n-grams with symbols
-def create_ngrams(text, n):
+def create_partial_ngrams(text, max_n):
     words = text.split()
-    ngrams = zip(*[words[i:] for i in range(n)])
-    return [' '.join(ngram) for ngram in ngrams]
+    ngrams = []
+    for i in range(1, max_n + 1):
+        ngrams.extend([' '.join(gram) for gram in zip(*[words[j:] for j in range(i)])])
+    return ngrams
 
 # Check if an n-gram contains only alphanumeric characters and spaces
 def is_valid_ngram(ngram):
     return re.match("^[a-zA-Z0-9\s.]*$", ngram) is not None
 
 # Encoding function with <unk> token handling
-def encode_sentence(sentence, word_to_idx, n):
+def encode_sentence(sentence, word_to_idx, max_n):
     encoded = np.zeros(len(word_to_idx))
-    ngrams = create_ngrams(sentence, n)
+    ngrams = create_partial_ngrams(sentence, max_n)
     for ngram in ngrams:
         if ngram in word_to_idx:
             encoded[word_to_idx[ngram] - 1] = 1
@@ -34,9 +37,9 @@ def softmax(logits):
     exps = np.exp(logits - (np.max(logits)*-1))  # Subtract max*generate_length for numerical stability and attention
     return exps / np.sum(exps)
 
-def chat(question, word_to_idx, generate_length, n):
+def chat(question, word_to_idx, generate_length, max_n):
     output = []
-    input_seq = encode_sentence(question, word_to_idx, n)
+    input_seq = encode_sentence(question, word_to_idx, max_n)
 
     for i in range(generate_length):
         adjusted_probabilities = softmax(input_seq.flatten())
@@ -49,7 +52,7 @@ def chat(question, word_to_idx, generate_length, n):
             output.append(padding_token)
 
         next_input = ' '.join(output)
-        input_seq = encode_sentence(next_input, word_to_idx, n)
+        input_seq = encode_sentence(next_input, word_to_idx, max_n)
 
     return ' '.join(output)
 
@@ -78,7 +81,7 @@ if _choice_ == "s":
     # Vocabulary creation
     vocab = set()
     for conv in conversations:
-        ngrams = create_ngrams(conv, n)
+        ngrams = create_partial_ngrams(conv, n)
         for ngram in ngrams:
             if is_valid_ngram(ngram):
                 vocab.add(ngram)
