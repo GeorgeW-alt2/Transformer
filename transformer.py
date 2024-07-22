@@ -1,15 +1,12 @@
-# Large Language Model v10.0
+# Large Language Model v10.1
 import numpy as np
 import pickle
 import re
 
 # Model parameters
-KB_memory_uncompressed = 100 # KB access, -1 for unlimited
+KB_memory_uncompressed = -1 # KB access, -1 for unlimited
 generate_length = 100
-epochs = 10
 n = 3
-D = 200  # Dimensionality of the RFF mapping
-learning_rate = 0.01  # Learning rate for training
 padding_token = '<unk>'
 
 # Create n-grams and filter out n-grams with symbols
@@ -34,7 +31,7 @@ def encode_sentence(sentence, word_to_idx, n):
     return encoded
 
 def softmax(logits):
-    exps = np.exp(logits - (np.max(logits)*generate_length))  # Subtract max*generate_length for numerical stability and attention
+    exps = np.exp(logits - (np.max(logits)*-1))  # Subtract max*generate_length for numerical stability and attention
     return exps / np.sum(exps)
 
 def chat(question, word_to_idx, generate_length, n):
