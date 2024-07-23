@@ -1,4 +1,5 @@
-# Large Language Model v11.2
+
+# Large Language Model v11.3
 
 import numpy as np
 import pickle
@@ -33,7 +34,7 @@ def softmax(logits):
 
 def chat(question, word_to_idx, generate_length, n):
     output = []
-    input_seq = encode_sentence(question*n, word_to_idx, n)
+    input_seq = encode_sentence(question, word_to_idx, n)
 
     for i in range(generate_length):
         adjusted_probabilities = softmax(input_seq.flatten())
@@ -44,7 +45,7 @@ def chat(question, word_to_idx, generate_length, n):
         output.append(ngram)
 
         next_input = ' '.join(output)
-        input_seq += encode_sentence(next_input, word_to_idx, n)
+        input_seq += encode_sentence( idx_to_word.get(predicted_idx+1, padding_token), word_to_idx, n)
         if ngram.find(".") > 0:
             break
     return ' '.join(output)
