@@ -1,4 +1,4 @@
-# Large Language Model v11.1
+# Large Language Model v11.2
 
 import numpy as np
 import pickle
@@ -45,8 +45,6 @@ def chat(question, word_to_idx, generate_length, n):
 
         next_input = ' '.join(output)
         input_seq += encode_sentence(next_input, word_to_idx, n)
-        if ngram.find(",") > 0:
-            input_seq -= encode_sentence(next_input, word_to_idx, n)
         if ngram.find(".") > 0:
             break
     return ' '.join(output)
