@@ -1,4 +1,4 @@
-# Large Language Model v11.0
+# Large Language Model v11.1
 
 import numpy as np
 import pickle
@@ -6,7 +6,7 @@ import re
 
 # Model parameters
 KB_memory_uncompressed = -1 # KB access, -1 for unlimited
-generate_length = 100
+generate_length = 25
 n = 3
 padding_token = '<unk>'
 
@@ -33,18 +33,22 @@ def softmax(logits):
 
 def chat(question, word_to_idx, generate_length, n):
     output = []
-    input_seq = encode_sentence(question, word_to_idx, n)
+    input_seq = encode_sentence(question*n, word_to_idx, n)
 
     for i in range(generate_length):
         adjusted_probabilities = softmax(input_seq.flatten())
 
         rng = np.random.default_rng()
         predicted_idx = rng.choice(range(len(adjusted_probabilities)), p=adjusted_probabilities)
-        output.append(idx_to_word.get(predicted_idx, padding_token))
+        ngram = idx_to_word.get(predicted_idx, padding_token)
+        output.append(ngram)
 
         next_input = ' '.join(output)
         input_seq += encode_sentence(next_input, word_to_idx, n)
-
+        if ngram.find(",") > 0:
+            input_seq -= encode_sentence(next_input, word_to_idx, n)
+        if ngram.find(".") > 0:
+            break
     return ' '.join(output)
 
 # Function to save word_dict to a file
@@ -72,7 +76,7 @@ if _choice_ == "s":
     # Vocabulary creation
     vocab = set()
     for conv in conversations:
-        ngrams = create_ngrams(conv, n)
+        ngrams = create_ngrams(conv + ".", n)
         for ngram in ngrams:
             vocab.add(ngram)
 
