@@ -1,5 +1,6 @@
 
-# Large Language Model v11.3
+
+# Large Language Model v11.4
 
 import numpy as np
 import pickle
@@ -23,9 +24,9 @@ def encode_sentence(sentence, word_to_idx, max_n):
     ngrams = create_ngrams(sentence, max_n)
     for ngram in ngrams:
         if ngram in word_to_idx:
-            encoded[word_to_idx[ngram] - 1] = 1
+            encoded[word_to_idx[ngram]] = 1
         else:
-            encoded[word_to_idx[padding_token] - 1] = 0
+            encoded[word_to_idx[padding_token]] = 1
     return encoded
 
 def softmax(logits):
@@ -45,9 +46,7 @@ def chat(question, word_to_idx, generate_length, n):
         output.append(ngram)
 
         next_input = ' '.join(output)
-        input_seq += encode_sentence( idx_to_word.get(predicted_idx+1, padding_token), word_to_idx, n)
-        if ngram.find(".") > 0:
-            break
+        input_seq += encode_sentence(  ' '.join(output), word_to_idx, n)
     return ' '.join(output)
 
 # Function to save word_dict to a file
@@ -83,7 +82,7 @@ if _choice_ == "s":
     vocab.add(padding_token)
 
     # Process word dictionary
-    word_to_idx = {word: idx for idx, word in enumerate(vocab, start=1)}  # Start indexing from 1
+    word_to_idx = {word: idx for idx, word in enumerate(vocab)}  # Start indexing from 1
     idx_to_word = {idx: word for word, idx in word_to_idx.items()}
     save_word_dict(word_to_idx, "langA.dat")
     save_word_dict(idx_to_word, "langB.dat")
