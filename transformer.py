@@ -1,4 +1,4 @@
-# Large Language Model v11.7
+# Large Language Model v11.8
 
 import numpy as np
 import pickle
@@ -19,7 +19,7 @@ def create_ngrams_and_words(text, max_n):
     return ngrams_and_words
 
 def encode_sentence(sentence, word_to_idx, max_n):
-    encoded = np.full(len(word_to_idx),2)
+    encoded = np.zeros(len(word_to_idx))
     tokens = create_ngrams_and_words(sentence, max_n)
     for ngram in tokens:
         probabilities = softmax(encoded.flatten())
@@ -32,23 +32,28 @@ def encode_sentence(sentence, word_to_idx, max_n):
 def softmax(logits):
     exps = np.exp(logits - np.max(logits)*-1)  # Subtract max for numerical stability
     return exps / np.sum(exps)
+    
+def nn_forward(X, W1, b1, W2, b2):
+     return np.exp(np.maximum(0, np.dot(np.dot(X, W1) + b1, W2) + b2)) / np.sum(np.exp(np.maximum(0, np.dot(np.dot(X, W1) + b1, W2) + b2)), axis=-1, keepdims=True)
 
 def chat(question, word_to_idx, generate_length, n):
     output = []
     input_seq = encode_sentence(question, word_to_idx, n)
-
+    
     for i in range(generate_length):
-        probabilities = softmax(input_seq.flatten())
+        input_seq_reshaped = softmax(input_seq.reshape(1, -1))  # Batch size of 1
+        probabilities = nn_forward(input_seq_reshaped, W1, b1, W2, b2).flatten()
 
         rng = np.random.default_rng()
-        predicted_idxs = rng.choice(range(len(probabilities)), p=probabilities,size = 2)
+        predicted_idxs = rng.choice(range(len(probabilities)), p=probabilities, size=2)
         for idx in predicted_idxs:
             ngram = idx_to_word.get(idx, padding_token)
             output.append(ngram)
 
         next_input = ' '.join(output)
-        input_seq = encode_sentence(  ' '.join(output), word_to_idx, n)
-    return ' '.join(output)
+        input_seq = encode_sentence(' '.join(output), word_to_idx, n)
+    
+    return ' '.join(output).strip()
 
 # Function to save word_dict to a file
 def save_word_dict(word_dict, filename):
@@ -91,6 +96,15 @@ if _choice_ == "s":
 if _choice_ == "l":
     word_to_idx = load_word_dict("langA.dat")
     idx_to_word = load_word_dict("langB.dat")
+
+# Initialize weights and biases
+input_size = len(word_to_idx)
+hidden_size = 128
+output_size = len(word_to_idx)
+W1 = np.random.randn(input_size, hidden_size)
+b1 = np.zeros(hidden_size)
+W2 = np.random.randn(hidden_size, output_size)
+b2 = np.zeros(output_size)
 
 # Example usage
 while True:
