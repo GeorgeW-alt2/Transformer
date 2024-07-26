@@ -1,4 +1,4 @@
-# Large Language Model v11.5
+# Large Language Model v11.6
 
 import numpy as np
 import pickle
@@ -10,17 +10,18 @@ generate_length = 25
 n = 3
 padding_token = '<unk>'
 
-# Generate n-grams from text
-def create_ngrams(text, n):
+def create_ngrams_and_words(text, max_n):
     words = text.split()
-    ngrams = zip(*[words[i:] for i in range(n)])
-    return [' '.join(ngram) for ngram in ngrams]
-    
-# Encoding function with <unk> token handling
+    ngrams_and_words = words.copy()  # Start with single words
+    for n in range(2, max_n + 1):
+        ngrams = zip(*[words[i:] for i in range(n)])
+        ngrams_and_words.extend([' '.join(ngram) for ngram in ngrams])
+    return ngrams_and_words
+
 def encode_sentence(sentence, word_to_idx, max_n):
     encoded = np.zeros(len(word_to_idx))
-    ngrams = create_ngrams(sentence, max_n)
-    for ngram in ngrams:
+    tokens = create_ngrams_and_words(sentence, max_n)
+    for ngram in tokens:
         probabilities = softmax(encoded.flatten())
         if ngram in word_to_idx:
             encoded[word_to_idx[ngram]] = probabilities[-1]
@@ -74,7 +75,7 @@ if _choice_ == "s":
     # Vocabulary creation
     vocab = set()
     for conv in conversations:
-        ngrams = create_ngrams(conv + ".", n)
+        ngrams = create_ngrams_and_words(conv + ".", n)
         for ngram in ngrams:
             vocab.add(ngram)
 
