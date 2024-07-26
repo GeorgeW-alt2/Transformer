@@ -1,11 +1,11 @@
-# Large Language Model v11.6
+# Large Language Model v11.7
 
 import numpy as np
 import pickle
 import re
 
 # Model parameters
-KB_memory_uncompressed = -1 # KB access, -1 for unlimited
+KB_memory_uncompressed = 1000 # KB access, -1 for unlimited
 generate_length = 25
 n = 3
 padding_token = '<unk>'
@@ -19,7 +19,7 @@ def create_ngrams_and_words(text, max_n):
     return ngrams_and_words
 
 def encode_sentence(sentence, word_to_idx, max_n):
-    encoded = np.zeros(len(word_to_idx))
+    encoded = np.full(len(word_to_idx),2)
     tokens = create_ngrams_and_words(sentence, max_n)
     for ngram in tokens:
         probabilities = softmax(encoded.flatten())
