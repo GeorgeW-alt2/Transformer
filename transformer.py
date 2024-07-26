@@ -1,6 +1,4 @@
-
-
-# Large Language Model v11.4
+# Large Language Model v11.5
 
 import numpy as np
 import pickle
@@ -23,8 +21,9 @@ def encode_sentence(sentence, word_to_idx, max_n):
     encoded = np.zeros(len(word_to_idx))
     ngrams = create_ngrams(sentence, max_n)
     for ngram in ngrams:
+        probabilities = softmax(encoded.flatten())
         if ngram in word_to_idx:
-            encoded[word_to_idx[ngram]] = 1
+            encoded[word_to_idx[ngram]] = probabilities[-1]
         else:
             encoded[word_to_idx[padding_token]] = 1
     return encoded
@@ -38,15 +37,16 @@ def chat(question, word_to_idx, generate_length, n):
     input_seq = encode_sentence(question, word_to_idx, n)
 
     for i in range(generate_length):
-        adjusted_probabilities = softmax(input_seq.flatten())
+        probabilities = softmax(input_seq.flatten())
 
         rng = np.random.default_rng()
-        predicted_idx = rng.choice(range(len(adjusted_probabilities)), p=adjusted_probabilities)
-        ngram = idx_to_word.get(predicted_idx, padding_token)
-        output.append(ngram)
+        predicted_idxs = rng.choice(range(len(probabilities)), p=probabilities,size = 2)
+        for idx in predicted_idxs:
+            ngram = idx_to_word.get(idx, padding_token)
+            output.append(ngram)
 
         next_input = ' '.join(output)
-        input_seq += encode_sentence(  ' '.join(output), word_to_idx, n)
+        input_seq = encode_sentence(  ' '.join(output), word_to_idx, n)
     return ' '.join(output)
 
 # Function to save word_dict to a file
