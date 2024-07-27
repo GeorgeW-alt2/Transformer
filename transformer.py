@@ -1,5 +1,4 @@
-	
-# Large Language Model v13.0
+# Large Language Model v13.1
 import numpy as np
 import pickle
 import re
@@ -7,7 +6,6 @@ import re
 # Model parameters
 KB_memory_uncompressed = -1  # KB access, -1 for unlimited
 generate_length = 25
-previous_context_influence = 0.9
 n = 3
 
 padding_token = '<unk>'
@@ -23,18 +21,16 @@ def create_ngrams_and_words(text, max_n):
 def encode_sentence(sentence, word_to_idx, max_n):
     encoded = np.zeros(len(word_to_idx))
     tokens = create_ngrams_and_words(sentence, max_n)
-    previous_indices = np.zeros(len(word_to_idx))
+    reuptake = np.zeros(len(word_to_idx))
 
     for ngram in tokens:
         if ngram in word_to_idx:
             idx = word_to_idx[ngram]
-            if idx in previous_indices:
-                encoded[previous_indices[idx]] *= previous_context_influence # Reduce the influence of the previous context
             encoded[idx] = 1
-            previous_indices[idx] = 1
+            reuptake[idx] = 1
         else:
             encoded[word_to_idx[padding_token]] = 1
-    encoded += previous_indices
+    encoded += reuptake
     return encoded
 
 def softmax(logits):
