@@ -1,14 +1,15 @@
 
-# Large Language Model v12.1
+# Large Language Model v12.4
 
 import numpy as np
 import pickle
 import re
 
 # Model parameters
-KB_memory_uncompressed = 1000 # KB access, -1 for unlimited
+KB_memory_uncompressed = -1 # KB access, -1 for unlimited
 generate_length = 25
 n = 3
+
 padding_token = '<unk>'
 
 def create_ngrams_and_words(text, max_n):
@@ -23,32 +24,35 @@ def encode_sentence(sentence, word_to_idx, max_n):
     encoded = np.zeros(len(word_to_idx))
     tokens = create_ngrams_and_words(sentence, max_n)
     for ngram in tokens:
-        probabilities = softmax(encoded.flatten())
+        tokens = create_ngrams_and_words(ngram, max_n)
+
         if ngram in word_to_idx:
-            encoded[word_to_idx[ngram]] = probabilities[-1]
-        else:
-            encoded[word_to_idx[padding_token]] = 1
+            encoded[word_to_idx[ngram]] = 1
+
     return encoded
 
 def softmax(logits):
-    exps = np.exp(logits - np.max(logits)*-1)  # Subtract max for numerical stability
+    exps = np.exp(logits - np.max(logits))  # Subtract max for numerical stability
     return exps / np.sum(exps)
 
 def chat(question, word_to_idx, generate_length, n):
     output = []
     input_seq = encode_sentence(question, word_to_idx, n)
-
+    
     for i in range(generate_length):
         probabilities = softmax(input_seq.flatten())
-
+        np.clip(probabilities, len(probabilities), input_seq)
         rng = np.random.default_rng()
         predicted_idx = rng.choice(range(len(probabilities)), p=probabilities)
         ngram = idx_to_word.get(predicted_idx, padding_token)
         output.append(ngram)
 
         next_input = ' '.join(output)
-        input_seq = encode_sentence(  ' '.join(output), word_to_idx, n)
-    return ' '.join(output)
+        input_seq = encode_sentence(next_input, word_to_idx, n)
+
+    generated_response = ' '.join(output)
+
+    return generated_response
 
 # Function to save word_dict to a file
 def save_word_dict(word_dict, filename):
