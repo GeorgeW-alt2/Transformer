@@ -1,4 +1,4 @@
-# Large Language Model v13.1
+# Large Language Model v14.0
 import numpy as np
 import pickle
 import re
@@ -26,8 +26,8 @@ def encode_sentence(sentence, word_to_idx, max_n):
     for ngram in tokens:
         if ngram in word_to_idx:
             idx = word_to_idx[ngram]
-            encoded[idx] = 1
-            reuptake[idx] = 1
+            encoded[idx] = 2
+            reuptake[idx] = -1
         else:
             encoded[word_to_idx[padding_token]] = 1
     encoded += reuptake
