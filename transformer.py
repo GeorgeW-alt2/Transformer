@@ -1,11 +1,13 @@
-# Large Language Model v16.2 X
+# Large Language Model v17.0 X
+
 
 import numpy as np
 import pickle
 import re
+from concurrent.futures import ThreadPoolExecutor
 
 # Model parameters
-KB_memory_uncompressed = -1 # KB access, -1 for unlimited
+KB_memory_uncompressed = -1  # KB access, -1 for unlimited
 generate_length = 100
 n = 3
 sigma = 0.7  # Width of the Gaussian functions
@@ -21,7 +23,15 @@ def create_ngrams_and_words(text, max_n):
     return ngrams_and_words
 
 def gaussian_rbf(x, c, s):
-    return np.exp(-np.linalg.norm(x-c)**2 / (2 * s**2))
+    return np.exp(-np.linalg.norm(x - c)**2 / (2 * s**2))
+
+def encode_ngram(ngram, token_vector, word_to_idx, centers, sigma):
+    if ngram in word_to_idx:
+        idx = word_to_idx[ngram]
+        return idx, gaussian_rbf(token_vector, centers[idx], sigma)
+    else:
+        idx = word_to_idx[padding_token]
+        return idx, gaussian_rbf(token_vector, centers[idx], sigma)
 
 def encode_sentence(sentence, word_to_idx, centers, sigma, max_n):
     encoded = np.zeros(len(word_to_idx))
@@ -33,14 +43,13 @@ def encode_sentence(sentence, word_to_idx, centers, sigma, max_n):
             token_vector[word_to_idx[token]] = 1
         else:
             token_vector[word_to_idx[padding_token]] = 1
-    
-    for ngram in tokens:
-        if ngram in word_to_idx:
-            idx = word_to_idx[ngram]
-            encoded[idx] = gaussian_rbf(token_vector, centers[idx], sigma)
-        else:
-            encoded[word_to_idx[padding_token]] = gaussian_rbf(token_vector, centers[word_to_idx[padding_token]], sigma)
-    
+
+    with ThreadPoolExecutor() as executor:
+        futures = [executor.submit(encode_ngram, ngram, token_vector, word_to_idx, centers, sigma) for ngram in tokens]
+        for future in futures:
+            idx, rbf_value = future.result()
+            encoded[idx] = rbf_value
+
     return encoded
 
 def softmax(logits):
@@ -50,7 +59,7 @@ def softmax(logits):
 def chat(question, word_to_idx, centers, sigma, generate_length, n):
     output = []
     input_seq = encode_sentence(question, word_to_idx, centers, sigma, n)
-    
+
     for i in range(generate_length):
         probabilities = softmax(input_seq.flatten())
         rng = np.random.default_rng()
@@ -78,13 +87,12 @@ def load_word_dict(filename):
     return word_dict
 
 def remove_sentences_with_numbers_and_symbols(sentences):
-
     filtered_sentences = []
     for sentence in sentences:
         if re.match(r'^[A-Za-z\s,.]+$', sentence):
             filtered_sentences.append(sentence)
     return filtered_sentences
-    
+
 _choice_ = input("\nSave new model/Load old model?[s/l]:").lower()
 
 word_to_idx = {}
@@ -94,7 +102,7 @@ if _choice_ == "s":
     with open("test.txt", encoding="UTF-8") as f:
         conversations = f.read().lower().split(".")[:KB_memory_uncompressed]
     conversations = remove_sentences_with_numbers_and_symbols(conversations)
-    print("Memory size: ",len(conversations))
+    print("Memory size: ", len(conversations))
     # Vocabulary creation
     vocab = set()
     for conv in conversations:
@@ -115,7 +123,7 @@ if _choice_ == "l":
     word_to_idx = load_word_dict("langA.dat")
     idx_to_word = load_word_dict("langB.dat")
 
-centers = np.linspace(-1,1,len(word_to_idx))  # Identity matrix as a simple example for centers
+centers = np.linspace(-1, 1, len(word_to_idx))  # Identity matrix as a simple example for centers
 
 # Example usage
 while True:
