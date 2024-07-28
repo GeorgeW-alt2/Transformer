@@ -1,11 +1,12 @@
-# Large Language Model v14.3
+# Large Language Model v15.0 X
+
 import numpy as np
 import pickle
 import re
 
 # Model parameters
-KB_memory_uncompressed = -1  # KB access, -1 for unlimited
-generate_length = 25
+KB_memory_uncompressed = 100  # KB access, -1 for unlimited
+generate_length = 100
 n = 3
 
 padding_token = '<unk>'
@@ -18,25 +19,36 @@ def create_ngrams_and_words(text, max_n):
         ngrams_and_words.extend([' '.join(ngram) for ngram in ngrams])
     return ngrams_and_words
 
-def encode_sentence(sentence, word_to_idx, max_n):
+def gaussian_rbf(x, c, s):
+    return np.exp(-np.linalg.norm(x-c)**2 / (2 * s**2))
+
+def encode_sentence(sentence, word_to_idx, centers, sigma, max_n):
     encoded = np.zeros(len(word_to_idx))
     tokens = create_ngrams_and_words(sentence, max_n)
 
+    token_vector = np.zeros(len(word_to_idx))
+    for token in tokens:
+        if token in word_to_idx:
+            token_vector[word_to_idx[token]] = 1
+        else:
+            token_vector[word_to_idx[padding_token]] = 1
+    
     for ngram in tokens:
         if ngram in word_to_idx:
             idx = word_to_idx[ngram]
-            encoded[idx] = 1
+            encoded[idx] = gaussian_rbf(token_vector, centers[idx], sigma)
         else:
-            encoded[word_to_idx[padding_token]] = 1
+            encoded[word_to_idx[padding_token]] = gaussian_rbf(token_vector, centers[word_to_idx[padding_token]], sigma)
+    
     return encoded
 
 def softmax(logits):
     exps = np.exp(logits - np.max(logits))  # Subtract max for numerical stability
     return exps / np.sum(exps)
 
-def chat(question, word_to_idx, generate_length, n):
+def chat(question, word_to_idx, centers, sigma, generate_length, n):
     output = []
-    input_seq = encode_sentence(question, word_to_idx, n)
+    input_seq = encode_sentence(question, word_to_idx, centers, sigma, n)
     
     for i in range(generate_length):
         probabilities = softmax(input_seq.flatten())
@@ -46,7 +58,7 @@ def chat(question, word_to_idx, generate_length, n):
         output.append(ngram)
 
         next_input = ' '.join(output)
-        input_seq = encode_sentence(next_input, word_to_idx, n)
+        input_seq = encode_sentence(next_input, word_to_idx, centers, sigma, n)
 
     generated_response = ' '.join(output)
     return generated_response
@@ -89,12 +101,20 @@ if _choice_ == "s":
     save_word_dict(word_to_idx, "langA.dat")
     save_word_dict(idx_to_word, "langB.dat")
 
+    # Define centers and sigma
+    centers = np.eye(len(word_to_idx))  # Identity matrix as a simple example for centers
+    sigma = 1.0  # Width of the Gaussian functions
+
 if _choice_ == "l":
     word_to_idx = load_word_dict("langA.dat")
     idx_to_word = load_word_dict("langB.dat")
 
+    # Define centers and sigma
+    centers = np.eye(len(word_to_idx))  # Identity matrix as a simple example for centers
+    sigma = 1.0  # Width of the Gaussian functions
+
 # Example usage
 while True:
     user_input = input("You: ")
-    response = chat(user_input, word_to_idx, generate_length, n)
+    response = chat(user_input, word_to_idx, centers, sigma, generate_length, n)
     print(f"AI: {response}")
