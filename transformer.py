@@ -1,4 +1,4 @@
-# Large Language Model v14.1
+# Large Language Model v14.3
 import numpy as np
 import pickle
 import re
@@ -21,16 +21,13 @@ def create_ngrams_and_words(text, max_n):
 def encode_sentence(sentence, word_to_idx, max_n):
     encoded = np.zeros(len(word_to_idx))
     tokens = create_ngrams_and_words(sentence, max_n)
-    reuptake = np.zeros(len(word_to_idx))
 
     for ngram in tokens:
         if ngram in word_to_idx:
             idx = word_to_idx[ngram]
-            encoded[idx] = 2
-            reuptake[idx+1] = -1
+            encoded[idx] = 1
         else:
             encoded[word_to_idx[padding_token]] = 1
-    encoded += reuptake
     return encoded
 
 def softmax(logits):
