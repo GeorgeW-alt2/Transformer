@@ -1,11 +1,11 @@
-# Large Language Model v16.1 X
+# Large Language Model v16.2 X
 
 import numpy as np
 import pickle
 import re
 
 # Model parameters
-KB_memory_uncompressed = 950  # KB access, -1 for unlimited
+KB_memory_uncompressed = -1 # KB access, -1 for unlimited
 generate_length = 100
 n = 3
 sigma = 0.7  # Width of the Gaussian functions
@@ -77,6 +77,14 @@ def load_word_dict(filename):
     print(f"Dictionary loaded from {filename}")
     return word_dict
 
+def remove_sentences_with_numbers_and_symbols(sentences):
+
+    filtered_sentences = []
+    for sentence in sentences:
+        if re.match(r'^[A-Za-z\s,.]+$', sentence):
+            filtered_sentences.append(sentence)
+    return filtered_sentences
+    
 _choice_ = input("\nSave new model/Load old model?[s/l]:").lower()
 
 word_to_idx = {}
@@ -85,7 +93,8 @@ if _choice_ == "s":
     # Load and preprocess data
     with open("test.txt", encoding="UTF-8") as f:
         conversations = f.read().lower().split(".")[:KB_memory_uncompressed]
-
+    conversations = remove_sentences_with_numbers_and_symbols(conversations)
+    print("Memory size: ",len(conversations))
     # Vocabulary creation
     vocab = set()
     for conv in conversations:
