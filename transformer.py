@@ -1,5 +1,4 @@
-# Large Language Model v17.0 X
-
+# Large Language Model v17.1 X
 
 import numpy as np
 import pickle
@@ -56,9 +55,16 @@ def softmax(logits):
     exps = np.exp(logits - np.max(logits))  # Subtract max for numerical stability
     return exps / np.sum(exps)
 
-def chat(question, word_to_idx, centers, sigma, generate_length, n):
+def chat(ngram_encoding_index, question, word_to_idx, generate_length, n):
     output = []
-    input_seq = encode_sentence(question, word_to_idx, centers, sigma, n)
+    encoded = np.zeros(len(word_to_idx))
+
+    ngrams = create_ngrams_and_words(question, n)
+    for ngram in ngrams:
+        if ngram in ngram_encoding_index:
+            idx, rbf_value = ngram_encoding_index[ngram]
+            encoded[idx] = rbf_value
+    input_seq = encoded
 
     for i in range(generate_length):
         probabilities = softmax(input_seq.flatten())
@@ -67,24 +73,30 @@ def chat(question, word_to_idx, centers, sigma, generate_length, n):
         ngram = idx_to_word.get(predicted_idx, padding_token)
         output.append(ngram)
 
+        encoded = np.zeros(len(word_to_idx))
         next_input = ' '.join(output)
-        input_seq = encode_sentence(next_input, word_to_idx, centers, sigma, n)
+        ngrams = create_ngrams_and_words(next_input, n)
+        for ngram in ngrams:
+            if ngram in ngram_encoding_index:
+                idx, rbf_value = ngram_encoding_index[ngram]
+                encoded[idx] = rbf_value
+        input_seq = encoded
 
     generated_response = ' '.join(output)
     return generated_response
 
-# Function to save word_dict to a file
-def save_word_dict(word_dict, filename):
+# Function to save a dictionary to a file
+def save_dict(dictionary, filename):
     with open(filename, 'wb') as f:
-        pickle.dump(word_dict, f)
+        pickle.dump(dictionary, f)
     print(f"Dictionary saved to {filename}")
 
-# Function to load word_dict from a file
-def load_word_dict(filename):
+# Function to load a dictionary from a file
+def load_dict(filename):
     with open(filename, 'rb') as f:
-        word_dict = pickle.load(f)
+        dictionary = pickle.load(f)
     print(f"Dictionary loaded from {filename}")
-    return word_dict
+    return dictionary
 
 def remove_sentences_with_numbers_and_symbols(sentences):
     filtered_sentences = []
@@ -93,16 +105,26 @@ def remove_sentences_with_numbers_and_symbols(sentences):
             filtered_sentences.append(sentence)
     return filtered_sentences
 
+def print_progress_bar(iteration, total, prefix='', suffix='', length=50, fill='█'):
+    percent = ("{0:.1f}").format(100 * (iteration / float(total)))
+    filled_length = int(length * iteration // total)
+    bar = fill * filled_length + '-' * (length - filled_length)
+    print(f'\r{prefix} |{bar}| {percent}% {suffix}', end='\r')
+    if iteration == total:
+        print()
+
 _choice_ = input("\nSave new model/Load old model?[s/l]:").lower()
 
 word_to_idx = {}
 idx_to_word = {}
+ngram_encoding_index = {}
 if _choice_ == "s":
     # Load and preprocess data
     with open("test.txt", encoding="UTF-8") as f:
         conversations = f.read().lower().split(".")[:KB_memory_uncompressed]
     conversations = remove_sentences_with_numbers_and_symbols(conversations)
     print("Memory size: ", len(conversations))
+    
     # Vocabulary creation
     vocab = set()
     for conv in conversations:
@@ -116,17 +138,34 @@ if _choice_ == "s":
     # Process word dictionary
     word_to_idx = {word: idx for idx, word in enumerate(vocab)}  # Start indexing from 1
     idx_to_word = {idx: word for word, idx in word_to_idx.items()}
-    save_word_dict(word_to_idx, "langA.dat")
-    save_word_dict(idx_to_word, "langB.dat")
+    save_dict(word_to_idx, "langA.dat")
+    save_dict(idx_to_word, "langB.dat")
+
+    # Create n-gram encoding index
+    centers = np.linspace(-1, 1, len(word_to_idx))  # Identity matrix as a simple example for centers
+    total_ngrams = len(vocab)
+    current_progress = 0
+    print_progress_bar(current_progress, total_ngrams, prefix='Progress:', suffix='Complete', length=50)
+    for ngram in vocab:
+        token_vector = np.zeros(len(word_to_idx))
+        if ngram in word_to_idx:
+            token_vector[word_to_idx[ngram]] = 1
+        else:
+            token_vector[word_to_idx[padding_token]] = 1
+        idx, rbf_value = encode_ngram(ngram, token_vector, word_to_idx, centers, sigma)
+        ngram_encoding_index[ngram] = (idx, rbf_value)
+        current_progress += 1
+        print_progress_bar(current_progress, total_ngrams, prefix='Progress:', suffix='Complete', length=50)
+    
+    save_dict(ngram_encoding_index, "model.dat")
 
 if _choice_ == "l":
-    word_to_idx = load_word_dict("langA.dat")
-    idx_to_word = load_word_dict("langB.dat")
-
-centers = np.linspace(-1, 1, len(word_to_idx))  # Identity matrix as a simple example for centers
+    word_to_idx = load_dict("langA.dat")
+    idx_to_word = load_dict("langB.dat")
+    ngram_encoding_index = load_dict("model.dat")
 
 # Example usage
 while True:
     user_input = input("You: ")
-    response = chat(user_input, word_to_idx, centers, sigma, generate_length, n)
+    response = chat(ngram_encoding_index, user_input, word_to_idx, generate_length, n)
     print(f"AI: {response}")
