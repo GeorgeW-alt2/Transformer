@@ -1,11 +1,11 @@
-# Large Language Model v15.1 X
+# Large Language Model v16.1 X
 
 import numpy as np
 import pickle
 import re
 
 # Model parameters
-KB_memory_uncompressed = 100  # KB access, -1 for unlimited
+KB_memory_uncompressed = 950  # KB access, -1 for unlimited
 generate_length = 100
 n = 3
 sigma = 0.7  # Width of the Gaussian functions
@@ -102,15 +102,11 @@ if _choice_ == "s":
     save_word_dict(word_to_idx, "langA.dat")
     save_word_dict(idx_to_word, "langB.dat")
 
-    # Define centers and sigma
-    centers = np.eye(len(word_to_idx))  # Identity matrix as a simple example for centers
-
 if _choice_ == "l":
     word_to_idx = load_word_dict("langA.dat")
     idx_to_word = load_word_dict("langB.dat")
 
-    # Define centers and sigma
-    centers = np.eye(len(word_to_idx))  # Identity matrix as a simple example for centers
+centers = np.linspace(-1,1,len(word_to_idx))  # Identity matrix as a simple example for centers
 
 # Example usage
 while True:
