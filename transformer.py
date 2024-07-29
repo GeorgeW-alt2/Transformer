@@ -1,4 +1,4 @@
-# Large Language Model v17.8 X
+# Large Language Model v17.9 X
 
 import numpy as np
 import pickle
@@ -6,7 +6,7 @@ import re
 from concurrent.futures import ThreadPoolExecutor
 
 # Model parameters
-KB_memory_uncompressed = 100  # KB access, -1 for unlimited
+KB_memory_uncompressed = -1  # KB access, -1 for unlimited
 generate_length = 100
 n = 3
 sigma = 0.7  # Width of the Gaussian functions
@@ -22,8 +22,7 @@ def create_ngrams_and_words(text, max_n):
     return ngrams_and_words
 
 def gaussian_rbf(x, c, s):
-    x, c, s = np.linalg.svd(np.vstack(x))
-    return np.exp(-np.linalg.norm(x - c)**2 / (2 * s**2))
+    return np.exp(-np.linalg.norm(x - np.dot(x, np.dot(x, c)))**2 / (2 * s**2))
 
 def encode_ngram(ngram, token_vector, word_to_idx, centers, sigma):
     if ngram in word_to_idx:
