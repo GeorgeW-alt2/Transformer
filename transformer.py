@@ -1,4 +1,4 @@
-# Large Language Model v17.22 X
+# Large Language Model v17.3 X
 
 import numpy as np
 import pickle
@@ -22,7 +22,7 @@ def create_ngrams_and_words(text, max_n):
     return ngrams_and_words
 
 def gaussian_rbf(x, c, s):
-    return np.exp(-np.linalg.norm(x - c)**2 / (2 * s**2))
+    return np.cumsum(-np.linalg.norm(x - c)**2 / (2 * s**2))
 
 def encode_ngram(ngram, token_vector, word_to_idx, centers, sigma):
     if ngram in word_to_idx:
