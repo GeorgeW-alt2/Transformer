@@ -1,4 +1,4 @@
-# LLM v18.4 - entity
+# LLM v18.5 - entity
 
 import numpy as np
 import pickle
@@ -71,18 +71,6 @@ def text_to_vector(text, word_to_idx):
 
 def chat(ngram_encoding_index, question, word_to_idx, generate_length, n):
     input_vector = text_to_vector(question, word_to_idx)
-    
-    max_similarity = 0
-    best_match = None
-    for stored_text in encountered_texts:
-        stored_vector = text_to_vector(stored_text, word_to_idx)
-        similarity = cosine_similarity(input_vector, stored_vector)
-        if similarity > max_similarity:
-            max_similarity = similarity
-            best_match = stored_text
-    
-    if max_similarity > 0.5:  # Adjust the threshold as needed
-        return f"Match found: {best_match}"
     
     output = []
     encoded = np.zeros(len(word_to_idx))
