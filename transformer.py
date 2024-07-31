@@ -1,4 +1,4 @@
-# Large Language Model v18.0 X
+# Large Language Model v18.1 X
 import numpy as np
 import pickle
 import re
@@ -261,15 +261,17 @@ mind_aspects = [
 
 
 while True:
-    response_pool = []
+    aspects = []
     encountered_texts = [] # add environment
     user_input = input("You: ")
+    response_begin = chat(ngram_encoding_index, user_input, word_to_idx, generate_length, n)
+
     for aspect in mind_aspects:
         response = chat(ngram_encoding_index, aspect.lower(), word_to_idx, generate_length, n)
-        response_pool.append(response) 
-    for i,unit in enumerate(response_pool):
-        X = encode_sentence(response, word_to_idx, centers, sigma, n)
-        Y = encode_sentence(unit, word_to_idx, centers, sigma, n)
+        aspects.append(response) 
+    for i,aspect_unit in enumerate(aspects):
+        X = encode_sentence(response_begin, word_to_idx, centers, sigma, n)
+        Y = encode_sentence(aspect_unit, word_to_idx, centers, sigma, n)
         if cosine_similarity(X, Y) > psych_threshold:
             print("Mode:",mind_aspects[i])
             break
