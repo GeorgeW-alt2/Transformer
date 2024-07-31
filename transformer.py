@@ -1,4 +1,5 @@
-# Large Language Model v18.4 - entity
+# LLM v18.4 - entity
+
 import numpy as np
 import pickle
 import re
@@ -6,11 +7,10 @@ import re
 # Model parameters
 KB_memory_uncompressed = 1000 # KB access, -1 for unlimited
 generate_length = 25
-sigma = 0.5  # Width of the Gaussian functions
-psych_threshold = 0.5
-epochs = 5
+sigma = 0.7  # Width of the Gaussian functions
 padding_token = '<unk>'
 n = 3
+
 def create_ngrams_and_words(text, max_n):
     words = text.split()
     ngrams_and_words = words.copy()  # Start with single words
@@ -175,11 +175,13 @@ if _choice_ == "s":
         current_progress += 1
         print_progress_bar(current_progress, total_ngrams, prefix='AutoGen:', suffix='Complete', length=50)
     
+    save_dict(ngram_encoding_index, "model.dat")
 
 if _choice_ == "l":
     word_to_idx = load_dict("langA.dat")
     idx_to_word = load_dict("langB.dat")
     ngram_encoding_index = load_dict("model.dat")
+    centers = np.linspace(-1, 1, len(word_to_idx))
 
 mind_aspects = [
     "Attention",
