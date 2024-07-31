@@ -1,4 +1,4 @@
-# Large Language Model v18.1 X
+# Large Language Model v18.2 - entity
 import numpy as np
 import pickle
 import re
@@ -275,5 +275,5 @@ while True:
         if cosine_similarity(X, Y) > psych_threshold:
             print("Mode:",mind_aspects[i])
             break
-    print(f"AI: {response}")
+    print(f"AI: {response_begin}")
     print()
