@@ -1,4 +1,4 @@
-# Large Language Model v18.3 - entity
+# Large Language Model v18.4 - entity
 import numpy as np
 import pickle
 import re
@@ -136,26 +136,6 @@ def print_progress_bar(iteration, total, prefix='', suffix='', length=50, fill='
     if iteration == total:
         print()
 
-def train_ngram_encoding_index(conversations, word_to_idx, centers, sigma, learning_rate=0.01):
-    for epoch in range(epochs):
-        print(f'Training epoch {epoch + 1}/{epochs}')
-        for sentence in conversations:
-            ngrams = create_ngrams_and_words(sentence, n)
-            token_vector = np.zeros(len(word_to_idx))
-            for ngram in ngrams:
-                if ngram in word_to_idx:
-                    token_vector[word_to_idx[ngram]] = 1
-                else:
-                    token_vector[word_to_idx[padding_token]] = 1
-
-            for ngram in ngrams:
-                if ngram in ngram_encoding_index:
-                    idx, rbf_value = ngram_encoding_index[ngram]
-                    target_vector = np.roll(token_vector, -1)
-                    error = rbf_value - target_vector[idx]
-                    centers[idx] -= learning_rate * error * (target_vector[idx] - centers[idx])
-    save_dict(centers, "centers.dat")
-
 _choice_ = input("\nSave new model/Load old model?[s/l]:").lower()
 
 word_to_idx = {}
@@ -195,14 +175,11 @@ if _choice_ == "s":
         current_progress += 1
         print_progress_bar(current_progress, total_ngrams, prefix='AutoGen:', suffix='Complete', length=50)
     
-    save_dict(ngram_encoding_index, "model.dat")
-    train_ngram_encoding_index(conversations, word_to_idx, centers, sigma)
 
 if _choice_ == "l":
     word_to_idx = load_dict("langA.dat")
     idx_to_word = load_dict("langB.dat")
     ngram_encoding_index = load_dict("model.dat")
-    centers = load_dict("centers.dat")
 
 mind_aspects = [
     "Attention",
