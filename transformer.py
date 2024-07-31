@@ -1,18 +1,16 @@
-# Large Language Model v17.9 X
-
+# Large Language Model v18.0 X
 import numpy as np
 import pickle
 import re
-from concurrent.futures import ThreadPoolExecutor
 
 # Model parameters
-KB_memory_uncompressed = -1  # KB access, -1 for unlimited
-generate_length = 100
+KB_memory_uncompressed = 1000 # KB access, -1 for unlimited
+generate_length = 25
 n = 3
 sigma = 0.7  # Width of the Gaussian functions
-
+epochs = 25
 padding_token = '<unk>'
-
+psych_threshold = 0.7
 def create_ngrams_and_words(text, max_n):
     words = text.split()
     ngrams_and_words = words.copy()  # Start with single words
@@ -22,7 +20,7 @@ def create_ngrams_and_words(text, max_n):
     return ngrams_and_words
 
 def gaussian_rbf(x, c, s):
-    return np.exp(-np.linalg.norm(x - np.dot(x, np.dot(x, c)))**2 / (2 * s**2))
+    return np.exp(-np.linalg.norm(x - c)**2 / (2 * s**2))
 
 def encode_ngram(ngram, token_vector, word_to_idx, centers, sigma):
     if ngram in word_to_idx:
@@ -43,19 +41,49 @@ def encode_sentence(sentence, word_to_idx, centers, sigma, max_n):
         else:
             token_vector[word_to_idx[padding_token]] = 1
 
-    with ThreadPoolExecutor() as executor:
-        futures = [executor.submit(encode_ngram, ngram, token_vector, word_to_idx, centers, sigma) for ngram in tokens]
-        for future in futures:
-            idx, rbf_value = future.result()
-            encoded[idx] = rbf_value
+    for token in tokens:
+        idx, rbf_value = encode_ngram(token, token_vector, word_to_idx, centers, sigma)
+        encoded[idx] = rbf_value
 
     return encoded
+
+def cosine_similarity(vec1, vec2):
+    dot_product = sum(a * b for a, b in zip(vec1, vec2))
+    magnitude1 = sum(a ** 2 for a in vec1) ** 0.5
+    magnitude2 = sum(b ** 2 for b in vec2) ** 0.5
+    if magnitude1 == 0 or magnitude2 == 0:
+        return 0
+    return dot_product / (magnitude1 * magnitude2)
 
 def softmax(logits):
     exps = np.exp(logits - np.max(logits))  # Subtract max for numerical stability
     return exps / np.sum(exps)
 
+def text_to_vector(text, word_to_idx):
+    vector = np.zeros(len(word_to_idx))
+    tokens = create_ngrams_and_words(text, n)
+    for token in tokens:
+        if token in word_to_idx:
+            vector[word_to_idx[token]] = 1
+        else:
+            vector[word_to_idx[padding_token]] = 1
+    return vector
+
 def chat(ngram_encoding_index, question, word_to_idx, generate_length, n):
+    input_vector = text_to_vector(question, word_to_idx)
+    
+    max_similarity = 0
+    best_match = None
+    for stored_text in encountered_texts:
+        stored_vector = text_to_vector(stored_text, word_to_idx)
+        similarity = cosine_similarity(input_vector, stored_vector)
+        if similarity > max_similarity:
+            max_similarity = similarity
+            best_match = stored_text
+    
+    if max_similarity > 0.5:  # Adjust the threshold as needed
+        return f"Match found: {best_match}"
+    
     output = []
     encoded = np.zeros(len(word_to_idx))
 
@@ -64,10 +92,9 @@ def chat(ngram_encoding_index, question, word_to_idx, generate_length, n):
         if ngram in ngram_encoding_index:
             idx, rbf_value = ngram_encoding_index[ngram]
             encoded[idx] = rbf_value
-    input_seq = encoded
 
     for i in range(generate_length):
-        probabilities = softmax(input_seq.flatten())
+        probabilities = softmax(encoded.flatten())
         rng = np.random.default_rng()
         predicted_idx = rng.choice(range(len(probabilities)), p=probabilities)
         ngram = idx_to_word.get(predicted_idx, padding_token)
@@ -80,18 +107,14 @@ def chat(ngram_encoding_index, question, word_to_idx, generate_length, n):
             if ngram in ngram_encoding_index:
                 idx, rbf_value = ngram_encoding_index[ngram]
                 encoded[idx] = rbf_value
-        input_seq = encoded
-
     generated_response = ' '.join(output)
     return generated_response
 
-# Function to save a dictionary to a file
 def save_dict(dictionary, filename):
     with open(filename, 'wb') as f:
         pickle.dump(dictionary, f)
     print(f"Dictionary saved to {filename}")
 
-# Function to load a dictionary from a file
 def load_dict(filename):
     with open(filename, 'rb') as f:
         dictionary = pickle.load(f)
@@ -113,39 +136,54 @@ def print_progress_bar(iteration, total, prefix='', suffix='', length=50, fill='
     if iteration == total:
         print()
 
+def train_ngram_encoding_index(conversations, word_to_idx, centers, sigma, learning_rate=0.01):
+    for epoch in range(epochs):
+        print(f'Training epoch {epoch + 1}/{epochs}')
+        for sentence in conversations:
+            ngrams = create_ngrams_and_words(sentence, n)
+            token_vector = np.zeros(len(word_to_idx))
+            for ngram in ngrams:
+                if ngram in word_to_idx:
+                    token_vector[word_to_idx[ngram]] = 1
+                else:
+                    token_vector[word_to_idx[padding_token]] = 1
+
+            for ngram in ngrams:
+                if ngram in ngram_encoding_index:
+                    idx, rbf_value = ngram_encoding_index[ngram]
+                    target_vector = np.roll(token_vector, -1)
+                    error = rbf_value - target_vector[idx]
+                    centers[idx] -= learning_rate * error * (target_vector[idx] - centers[idx])
+    save_dict(centers, "centers.dat")
+
 _choice_ = input("\nSave new model/Load old model?[s/l]:").lower()
 
 word_to_idx = {}
 idx_to_word = {}
 ngram_encoding_index = {}
 if _choice_ == "s":
-    # Load and preprocess data
     with open("test.txt", encoding="UTF-8") as f:
         conversations = f.read().lower().split(".")[:KB_memory_uncompressed]
     conversations = remove_sentences_with_numbers_and_symbols(conversations)
     print("Memory size: ", len(conversations))
     
-    # Vocabulary creation
     vocab = set()
     for conv in conversations:
         ngrams = create_ngrams_and_words(conv + ".", n)
         for ngram in ngrams:
             vocab.add(ngram)
 
-    # Add a special token for unknown words
     vocab.add(padding_token)
 
-    # Process word dictionary
-    word_to_idx = {word: idx for idx, word in enumerate(vocab)}  # Start indexing from 1
+    word_to_idx = {word: idx for idx, word in enumerate(vocab)}
     idx_to_word = {idx: word for word, idx in word_to_idx.items()}
     save_dict(word_to_idx, "langA.dat")
     save_dict(idx_to_word, "langB.dat")
 
-    # Create n-gram encoding index
-    centers = np.linspace(-1, 1, len(word_to_idx))  # Identity matrix as a simple example for centers
+    centers = np.linspace(-1, 1, len(word_to_idx))
     total_ngrams = len(vocab)
     current_progress = 0
-    print_progress_bar(current_progress, total_ngrams, prefix='Progress:', suffix='Complete', length=50)
+    print_progress_bar(current_progress, total_ngrams, prefix='AutoGen:', suffix='Complete', length=50)
     for ngram in vocab:
         token_vector = np.zeros(len(word_to_idx))
         if ngram in word_to_idx:
@@ -155,17 +193,85 @@ if _choice_ == "s":
         idx, rbf_value = encode_ngram(ngram, token_vector, word_to_idx, centers, sigma)
         ngram_encoding_index[ngram] = (idx, rbf_value)
         current_progress += 1
-        print_progress_bar(current_progress, total_ngrams, prefix='Progress:', suffix='Complete', length=50)
+        print_progress_bar(current_progress, total_ngrams, prefix='AutoGen:', suffix='Complete', length=50)
     
     save_dict(ngram_encoding_index, "model.dat")
+    train_ngram_encoding_index(conversations, word_to_idx, centers, sigma)
 
 if _choice_ == "l":
     word_to_idx = load_dict("langA.dat")
     idx_to_word = load_dict("langB.dat")
     ngram_encoding_index = load_dict("model.dat")
+    centers = load_dict("centers.dat")
 
-# Example usage
+mind_aspects = [
+    "Attention",
+    "Memory",
+    "Perception",
+    "Cognition",
+    "Consciousness",
+    "Emotion",
+    "Reasoning",
+    "Imagination",
+    "Learning",
+    "Intuition",
+    "Judgment",
+    "Awareness",
+    "Focus",
+    "Creativity",
+    "Problem-Solving",
+    "Decision-Making",
+    "Thinking",
+    "Planning",
+    "Language",
+    "Self-Control",
+    "Insight",
+    "Empathy",
+    "Mindfulness",
+    "Self-Awareness",
+    "Abstract Thinking",
+    "Critical Thinking",
+    "Analytical Thinking",
+    "Creative Thinking",
+    "Reflective Thinking",
+    "Spatial Thinking",
+    "Logical Thinking",
+    "Emotional Intelligence",
+    "Reasoning",
+    "Perceptual Thinking",
+    "Conceptual Thinking",
+    "Decision-Making",
+    "Problem-Solving",
+    "Meta-Cognition",
+    "Attention Span",
+    "Working Memory",
+    "Long-Term Memory",
+    "Short-Term Memory",
+    "Learning Styles",
+    "Cognitive Biases",
+    "Thinking Patterns",
+    "Motivation",
+    "Insightfulness",
+    "Self-Efficacy",
+    "Stress Management",
+    "Cognitive Flexibility",
+    "Mental Imagery"
+]
+
+
+
 while True:
+    response_pool = []
+    encountered_texts = [] # add environment
     user_input = input("You: ")
-    response = chat(ngram_encoding_index, user_input, word_to_idx, generate_length, n)
+    for aspect in mind_aspects:
+        response = chat(ngram_encoding_index, aspect.lower(), word_to_idx, generate_length, n)
+        response_pool.append(response) 
+    for i,unit in enumerate(response_pool):
+        X = encode_sentence(response, word_to_idx, centers, sigma, n)
+        Y = encode_sentence(unit, word_to_idx, centers, sigma, n)
+        if cosine_similarity(X, Y) > psych_threshold:
+            print("Mode:",mind_aspects[i])
+            break
     print(f"AI: {response}")
+    print()
