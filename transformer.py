@@ -1,4 +1,4 @@
-# Large Language Model v18.2 - entity
+# Large Language Model v18.3 - entity
 import numpy as np
 import pickle
 import re
@@ -6,11 +6,11 @@ import re
 # Model parameters
 KB_memory_uncompressed = 1000 # KB access, -1 for unlimited
 generate_length = 25
-n = 3
-sigma = 0.7  # Width of the Gaussian functions
-epochs = 25
+sigma = 0.5  # Width of the Gaussian functions
+psych_threshold = 0.5
+epochs = 5
 padding_token = '<unk>'
-psych_threshold = 0.7
+n = 3
 def create_ngrams_and_words(text, max_n):
     words = text.split()
     ngrams_and_words = words.copy()  # Start with single words
@@ -263,6 +263,7 @@ mind_aspects = [
 while True:
     aspects = []
     encountered_texts = [] # add environment
+    mental_state = []
     user_input = input("You: ")
     response_begin = chat(ngram_encoding_index, user_input, word_to_idx, generate_length, n)
 
@@ -272,8 +273,13 @@ while True:
     for i,aspect_unit in enumerate(aspects):
         X = encode_sentence(response_begin, word_to_idx, centers, sigma, n)
         Y = encode_sentence(aspect_unit, word_to_idx, centers, sigma, n)
-        if cosine_similarity(X, Y) > psych_threshold:
-            print("Mode:",mind_aspects[i])
-            break
+        mental_state.append(cosine_similarity(X, Y)) 
+    # Determine the aspect with the highest similarity
+    max_similarity = max(mental_state)
+    if max_similarity:
+        mode_index = mental_state.index(max_similarity)
+        print("Mode:", mind_aspects[mode_index],"@",max_similarity)
+        
+            
     print(f"AI: {response_begin}")
     print()
