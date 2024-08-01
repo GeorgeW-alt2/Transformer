@@ -1,4 +1,4 @@
-# LLM v18.6 - entity
+# LLM v18.7 - entity
 
 import numpy as np
 import pickle
@@ -228,6 +228,58 @@ mind_aspects = [
     "Mental Imagery"
 ]
 
+goals = [
+    "Learn a new programming language",
+    "Build a personal website",
+    "Read 20 books in a year",
+    "Run a marathon",
+    "Start a blog",
+    "Save a certain amount of money",
+    "Travel to a new country",
+    "Learn to play a musical instrument",
+    "Get a certification in a professional skill",
+    "Lose a certain amount of weight",
+    "Cook a new recipe every week",
+    "Volunteer for a cause",
+    "Take a photography course",
+    "Write a book",
+    "Meditate daily for 30 days",
+    "Learn to dance",
+    "Complete a DIY project",
+    "Get a promotion at work",
+    "Run a half-marathon",
+    "Learn a new language",
+    "Create a YouTube channel",
+    "Attend a conference or workshop",
+    "Improve public speaking skills",
+    "Learn to code an app",
+    "Create a budget and stick to it",
+    "Practice yoga regularly",
+    "Take an art class",
+    "Learn to swim",
+    "Complete a 30-day fitness challenge",
+    "Improve time management skills",
+    "Visit all national parks in your country",
+    "Get better at networking",
+    "Start a side business",
+    "Write a daily journal",
+    "Learn about investment and stocks",
+    "Create a podcast",
+    "Learn to garden",
+    "Become a mentor",
+    "Read scientific papers regularly",
+    "Improve mental health",
+    "Achieve a work-life balance",
+    "Participate in a hackathon",
+    "Develop a mobile app",
+    "Create a new invention",
+    "Learn advanced data analysis",
+    "Master a new software tool",
+    "Join a book club",
+    "Develop better eating habits",
+    "Improve sleep quality"
+]
+
 
 
 while True:
@@ -237,7 +289,7 @@ while True:
     simulation = []
     user_input = input("You: ")
 
-    for aspect in mind_aspects:
+    for aspect in goals:
         X = encode_sentence(chat(ngram_encoding_index, user_input.lower(), word_to_idx, generate_length, n), word_to_idx, centers, sigma, n)
         Y = encode_sentence(chat(ngram_encoding_index, aspect.lower(), word_to_idx, generate_length, n), word_to_idx, centers, sigma, n)
         simulation.append(cosine_similarity(X, Y))
@@ -253,7 +305,7 @@ while True:
             X = encode_sentence(response_begin.lower(), word_to_idx, centers, sigma, n)
             Y = encode_sentence(response_check.lower(), word_to_idx, centers, sigma, n)
             if cosine_similarity(X, Y) > agent_quality:
-                print("Instruction:", mind_aspects[instruction])
+                print("Instruction:", goals[instruction])
                 break
     else:
         aspects = []
