@@ -1,11 +1,11 @@
-# LLM v18.7 - entity
+# LLM v18.8 - entity
 
 import numpy as np
 import pickle
 import re
 
 # Model parameters
-KB_memory_uncompressed = 4000 # KB access, -1 for unlimited
+KB_memory_uncompressed = 2000 # KB access, -1 for unlimited
 generate_length = 25
 agency_attempts = 125
 agency_threshold = 0.2
@@ -299,7 +299,7 @@ while True:
         instruction = np.argmax(simulation)
 
         for i in range(agency_attempts):
-            response_check = chat(ngram_encoding_index, mind_aspects[instruction].lower(), word_to_idx, generate_length, n)
+            response_check = chat(ngram_encoding_index, goals[instruction].lower(), word_to_idx, generate_length, n)
 
             response_begin = chat(ngram_encoding_index, user_input, word_to_idx, generate_length, n)
             X = encode_sentence(response_begin.lower(), word_to_idx, centers, sigma, n)
