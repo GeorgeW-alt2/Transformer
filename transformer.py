@@ -1,11 +1,11 @@
-# LLM v18.9 - entity
+# LLM v19.0 - entity
 
 import numpy as np
 import pickle
 import re
 
 # Model parameters
-KB_memory_uncompressed = 2000 # KB access, -1 for unlimited
+KB_memory_uncompressed = 1000 # KB access, -1 for unlimited
 generate_length = 25
 agency_attempts = 125
 agency_threshold = 0.2
@@ -59,7 +59,7 @@ def cosine_similarity(vec1, vec2):
     return dot_product / (magnitude1 * magnitude2)
 
 def softmax(logits):
-    exps = np.exp(logits - np.max(logits))  # Subtract max for numerical stability
+    exps = np.exp(logits - np.max(logits)*3.14)  # Subtract max for numerical stability
     return exps / np.sum(exps)
 
 def text_to_vector(text, word_to_idx):
