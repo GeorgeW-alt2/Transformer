@@ -1,4 +1,4 @@
-# LLM v18.8 - entity
+# LLM v18.9 - entity
 
 import numpy as np
 import pickle
@@ -229,55 +229,56 @@ mind_aspects = [
 ]
 
 goals = [
-    "Learn a new programming language",
-    "Build a personal website",
-    "Read 20 books in a year",
-    "Run a marathon",
-    "Start a blog",
-    "Save a certain amount of money",
-    "Travel to a new country",
-    "Learn to play a musical instrument",
-    "Get a certification in a professional skill",
-    "Lose a certain amount of weight",
-    "Cook a new recipe every week",
-    "Volunteer for a cause",
-    "Take a photography course",
-    "Write a book",
-    "Meditate daily for 30 days",
-    "Learn to dance",
-    "Complete a DIY project",
-    "Get a promotion at work",
-    "Run a half-marathon",
-    "Learn a new language",
-    "Create a YouTube channel",
-    "Attend a conference or workshop",
-    "Improve public speaking skills",
-    "Learn to code an app",
-    "Create a budget and stick to it",
-    "Practice yoga regularly",
-    "Take an art class",
-    "Learn to swim",
-    "Complete a 30-day fitness challenge",
-    "Improve time management skills",
-    "Visit all national parks in your country",
-    "Get better at networking",
-    "Start a side business",
-    "Write a daily journal",
-    "Learn about investment and stocks",
-    "Create a podcast",
-    "Learn to garden",
-    "Become a mentor",
-    "Read scientific papers regularly",
-    "Improve mental health",
-    "Achieve a work-life balance",
-    "Participate in a hackathon",
-    "Develop a mobile app",
-    "Create a new invention",
-    "Learn advanced data analysis",
-    "Master a new software tool",
-    "Join a book club",
-    "Develop better eating habits",
-    "Improve sleep quality"
+    "Achieve human-level natural language understanding",
+    "Translate languages in real-time",
+    "Generate creative content like poems, stories, and songs",
+    "Diagnose medical conditions from images and data",
+    "Predict stock market trends",
+    "Personalize learning experiences for students",
+    "Automate customer service interactions",
+    "Enhance cybersecurity measures",
+    "Optimize supply chain logistics",
+    "Assist in scientific research and discovery",
+    "Improve speech recognition accuracy",
+    "Generate realistic images and videos",
+    "Develop autonomous vehicles",
+    "Analyze large datasets for insights",
+    "Improve recommendations for streaming services",
+    "Identify and reduce bias in algorithms",
+    "Enhance virtual and augmented reality experiences",
+    "Predict and mitigate natural disasters",
+    "Create virtual assistants with emotional intelligence",
+    "Automate repetitive tasks in various industries",
+    "Improve energy efficiency in buildings",
+    "Develop better fraud detection systems",
+    "Assist in legal research and case analysis",
+    "Enhance human-robot collaboration",
+    "Optimize agricultural practices",
+    "Improve personalized healthcare",
+    "Generate and evaluate business strategies",
+    "Assist in language preservation and revitalization",
+    "Improve accessibility for individuals with disabilities",
+    "Enhance online education platforms",
+    "Predict and prevent equipment failures",
+    "Optimize financial portfolios",
+    "Develop smarter home automation systems",
+    "Analyze social media trends",
+    "Improve urban planning and traffic management",
+    "Create immersive gaming experiences",
+    "Enhance drug discovery and development",
+    "Optimize renewable energy sources",
+    "Develop advanced personal finance tools",
+    "Improve environmental monitoring and conservation",
+    "Assist in mental health diagnosis and treatment",
+    "Generate synthetic data for training models",
+    "Enhance content moderation and filtering",
+    "Develop better chatbots for mental health support",
+    "Optimize website and app user experiences",
+    "Assist in forensic investigations",
+    "Improve disaster response coordination",
+    "Enhance predictive maintenance for infrastructure",
+    "Assist in personalized marketing campaigns",
+    "Develop AI-driven art and design tools"
 ]
 
 
@@ -305,7 +306,7 @@ while True:
             X = encode_sentence(response_begin.lower(), word_to_idx, centers, sigma, n)
             Y = encode_sentence(response_check.lower(), word_to_idx, centers, sigma, n)
             if cosine_similarity(X, Y) > agent_quality:
-                print("Instruction:", goals[instruction])
+                print("Goal:", goals[instruction])
                 break
     else:
         aspects = []
