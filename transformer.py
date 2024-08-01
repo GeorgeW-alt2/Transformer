@@ -1,12 +1,15 @@
-# LLM v18.5 - entity
+# LLM v18.6 - entity
 
 import numpy as np
 import pickle
 import re
 
 # Model parameters
-KB_memory_uncompressed = 1000 # KB access, -1 for unlimited
+KB_memory_uncompressed = 4000 # KB access, -1 for unlimited
 generate_length = 25
+agency_attempts = 125
+agency_threshold = 0.2
+agent_quality = 0.1
 sigma = 0.7  # Width of the Gaussian functions
 padding_token = '<unk>'
 n = 3
@@ -229,24 +232,46 @@ mind_aspects = [
 
 while True:
     aspects = []
-    encountered_texts = [] # add environment
+    encountered_texts = []  # Placeholder for environment
     mental_state = []
+    simulation = []
     user_input = input("You: ")
-    response_begin = chat(ngram_encoding_index, user_input, word_to_idx, generate_length, n)
 
     for aspect in mind_aspects:
-        response = chat(ngram_encoding_index, aspect.lower(), word_to_idx, generate_length, n)
-        aspects.append(response) 
-    for i,aspect_unit in enumerate(aspects):
-        X = encode_sentence(response_begin, word_to_idx, centers, sigma, n)
-        Y = encode_sentence(aspect_unit, word_to_idx, centers, sigma, n)
-        mental_state.append(cosine_similarity(X, Y)) 
-    # Determine the aspect with the highest similarity
-    max_similarity = max(mental_state)
-    if max_similarity:
-        mode_index = mental_state.index(max_similarity)
-        print("Mode:", mind_aspects[mode_index],"@",max_similarity)
-        
+        X = encode_sentence(chat(ngram_encoding_index, user_input.lower(), word_to_idx, generate_length, n), word_to_idx, centers, sigma, n)
+        Y = encode_sentence(chat(ngram_encoding_index, aspect.lower(), word_to_idx, generate_length, n), word_to_idx, centers, sigma, n)
+        simulation.append(cosine_similarity(X, Y))
+
+    max_simulation = max(simulation)
+    if max_simulation >= agency_threshold:
+        instruction = np.argmax(simulation)
+
+        for i in range(agency_attempts):
+            response_check = chat(ngram_encoding_index, mind_aspects[instruction].lower(), word_to_idx, generate_length, n)
+
+            response_begin = chat(ngram_encoding_index, user_input, word_to_idx, generate_length, n)
+            X = encode_sentence(response_begin.lower(), word_to_idx, centers, sigma, n)
+            Y = encode_sentence(response_check.lower(), word_to_idx, centers, sigma, n)
+            if cosine_similarity(X, Y) > agent_quality:
+                print("Instruction:", mind_aspects[instruction])
+                break
+    else:
+        aspects = []
+        mental_state = []
+
+        response_begin = chat(ngram_encoding_index, user_input, word_to_idx, generate_length, n)
+
+        for aspect in mind_aspects:
+            response = chat(ngram_encoding_index, aspect.lower(), word_to_idx, generate_length, n)
+            aspects.append(response) 
+        for i,aspect_unit in enumerate(aspects):
+            X = encode_sentence(response_begin, word_to_idx, centers, sigma, n)
+            Y = encode_sentence(aspect_unit, word_to_idx, centers, sigma, n)
+            mental_state.append(cosine_similarity(X, Y)) 
+        # Determine the aspect with the highest similarity
+        mode_index = np.argmax(mental_state)
+        if mode_index:
+            print("Mode:", mind_aspects[mode_index])
             
     print(f"AI: {response_begin}")
     print()
