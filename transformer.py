@@ -1,4 +1,4 @@
-# LLM v19.0 - entity
+# LLM v19.1 - entity
 
 import numpy as np
 import pickle
@@ -59,7 +59,7 @@ def cosine_similarity(vec1, vec2):
     return dot_product / (magnitude1 * magnitude2)
 
 def softmax(logits):
-    exps = np.exp(logits - np.max(logits)*3.14)  # Subtract max for numerical stability
+    exps = np.exp(logits - np.max(logits))  # Subtract max for numerical stability
     return exps / np.sum(exps)
 
 def text_to_vector(text, word_to_idx):
@@ -227,59 +227,60 @@ mind_aspects = [
     "Cognitive Flexibility",
     "Mental Imagery"
 ]
-
-goals = [
-    "Achieve human-level natural language understanding",
-    "Translate languages in real-time",
-    "Generate creative content like poems, stories, and songs",
-    "Diagnose medical conditions from images and data",
-    "Predict stock market trends",
-    "Personalize learning experiences for students",
-    "Automate customer service interactions",
-    "Enhance cybersecurity measures",
-    "Optimize supply chain logistics",
-    "Assist in scientific research and discovery",
-    "Improve speech recognition accuracy",
-    "Generate realistic images and videos",
-    "Develop autonomous vehicles",
-    "Analyze large datasets for insights",
-    "Improve recommendations for streaming services",
-    "Identify and reduce bias in algorithms",
-    "Enhance virtual and augmented reality experiences",
-    "Predict and mitigate natural disasters",
-    "Create virtual assistants with emotional intelligence",
-    "Automate repetitive tasks in various industries",
-    "Improve energy efficiency in buildings",
-    "Develop better fraud detection systems",
-    "Assist in legal research and case analysis",
-    "Enhance human-robot collaboration",
-    "Optimize agricultural practices",
-    "Improve personalized healthcare",
-    "Generate and evaluate business strategies",
-    "Assist in language preservation and revitalization",
-    "Improve accessibility for individuals with disabilities",
-    "Enhance online education platforms",
-    "Predict and prevent equipment failures",
-    "Optimize financial portfolios",
-    "Develop smarter home automation systems",
-    "Analyze social media trends",
-    "Improve urban planning and traffic management",
-    "Create immersive gaming experiences",
-    "Enhance drug discovery and development",
-    "Optimize renewable energy sources",
-    "Develop advanced personal finance tools",
-    "Improve environmental monitoring and conservation",
-    "Assist in mental health diagnosis and treatment",
-    "Generate synthetic data for training models",
-    "Enhance content moderation and filtering",
-    "Develop better chatbots for mental health support",
-    "Optimize website and app user experiences",
-    "Assist in forensic investigations",
-    "Improve disaster response coordination",
-    "Enhance predictive maintenance for infrastructure",
-    "Assist in personalized marketing campaigns",
-    "Develop AI-driven art and design tools"
+semantic_goals = [
+    "Strategic Planning",
+    "Task Prioritization",
+    "Problem Solving",
+    "Resource Management",
+    "Cognitive Flexibility",
+    "Impulse Control",
+    "Working Memory",
+    "Decision-Making",
+    "Goal Setting",
+    "Self-Monitoring",
+    "Attention Management",
+    "Error Detection and Correction",
+    "Emotional Regulation",
+    "Information Integration",
+    "Long-term Planning",
+    "Risk Assessment",
+    "Behavioral Inhibition",
+    "Reflection and Insight",
+    "Adaptability",
+    "Motivational Regulation",
+    "Self-Discipline",
+    "Time Management",
+    "Organizational Skills",
+    "Critical Thinking",
+    "Creative Thinking",
+    "Detail Orientation",
+    "Self-Evaluation",
+    "Stress Management",
+    "Delegation",
+    "Prior Knowledge Activation",
+    "Conceptual Thinking",
+    "Learning from Experience",
+    "Perspective Taking",
+    "Judgment",
+    "Conflict Resolution",
+    "Negotiation",
+    "Effective Communication",
+    "Leadership",
+    "Empathy",
+    "Goal Adjustment",
+    "Habit Formation",
+    "Energy Management",
+    "Metacognition",
+    "Analytical Thinking",
+    "Synthesis of Ideas",
+    "Contextual Understanding",
+    "Innovation",
+    "Collaboration",
+    "Self-Motivation",
+    "Perseverance"
 ]
+
+
 
 
 
@@ -290,7 +291,7 @@ while True:
     simulation = []
     user_input = input("You: ")
 
-    for aspect in goals:
+    for aspect in semantic_goals:
         X = encode_sentence(chat(ngram_encoding_index, user_input.lower(), word_to_idx, generate_length, n), word_to_idx, centers, sigma, n)
         Y = encode_sentence(chat(ngram_encoding_index, aspect.lower(), word_to_idx, generate_length, n), word_to_idx, centers, sigma, n)
         simulation.append(cosine_similarity(X, Y))
@@ -300,13 +301,13 @@ while True:
         instruction = np.argmax(simulation)
 
         for i in range(agency_attempts):
-            response_check = chat(ngram_encoding_index, goals[instruction].lower(), word_to_idx, generate_length, n)
+            response_check = chat(ngram_encoding_index, semantic_goals[instruction].lower(), word_to_idx, generate_length, n)
 
             response_begin = chat(ngram_encoding_index, user_input, word_to_idx, generate_length, n)
             X = encode_sentence(response_begin.lower(), word_to_idx, centers, sigma, n)
             Y = encode_sentence(response_check.lower(), word_to_idx, centers, sigma, n)
             if cosine_similarity(X, Y) > agent_quality:
-                print("Goal:", goals[instruction])
+                print("Goal:", semantic_goals[instruction])
                 break
     else:
         aspects = []
