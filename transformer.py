@@ -1,4 +1,4 @@
-# LLM v19.1 - entity
+# LLM v19.2 - entity
 
 import numpy as np
 import pickle
@@ -13,6 +13,9 @@ agent_quality = 0.1
 sigma = 0.7  # Width of the Gaussian functions
 padding_token = '<unk>'
 n = 3
+
+def filter_text(text):
+    return re.sub(r'[^A-Za-z\s]', '', text)
 
 def create_ngrams_and_words(text, max_n):
     words = text.split()
@@ -289,7 +292,7 @@ while True:
     encountered_texts = []  # Placeholder for environment
     mental_state = []
     simulation = []
-    user_input = input("You: ")
+    user_input = filter_text(input("You: "))
 
     for aspect in semantic_goals:
         X = encode_sentence(chat(ngram_encoding_index, user_input.lower(), word_to_idx, generate_length, n), word_to_idx, centers, sigma, n)
