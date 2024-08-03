@@ -1,15 +1,13 @@
-# LLM v19.3 - entity
+# LLM v19.4 - entity
 
 import numpy as np
 import pickle
 import re
 
 # Model parameters
-KB_memory_uncompressed = 1000 # KB access, -1 for unlimited
+KB_memory_uncompressed = 3000 # KB access, -1 for unlimited
 generate_length = 25
-agency_attempts = 125
-agency_threshold = 0.2
-agent_quality = 0.1
+Qlevels = 1280
 sigma = 0.7  # Width of the Gaussian functions
 padding_token = '<unk>'
 n = 3
@@ -26,18 +24,14 @@ def create_ngrams_and_words(text, max_n):
     return ngrams_and_words
 
 def quantize(values, num_levels):
-    """Quantize values to a limited number of levels."""
     min_val = np.min(values)
     max_val = np.max(values)
     levels = np.linspace(min_val, max_val, num_levels)
     quantized = np.digitize(values, levels) - 1
     return levels[quantized]
 
-def gaussian_rbf(x, c, s, num_quantization_levels=10):
-    x_quantized = quantize(x, num_quantization_levels)
-    c_quantized = quantize(c, num_quantization_levels)
-    
-    return np.exp(-np.linalg.norm(x_quantized - c_quantized)**2 / (2 * s**2))
+def gaussian_rbf(x, c, s):
+    return np.exp(-np.linalg.norm(x - c)**2 / (2 * s**2))
 
 def encode_ngram(ngram, token_vector, word_to_idx, centers, sigma):
     if ngram in word_to_idx:
@@ -73,7 +67,7 @@ def cosine_similarity(vec1, vec2):
     return dot_product / (magnitude1 * magnitude2)
 
 def softmax(logits):
-    exps = np.exp(logits - np.max(logits))  # Subtract max for numerical stability
+    exps = np.exp(logits - np.max(logits))  
     return exps / np.sum(exps)
 
 def text_to_vector(text, word_to_idx):
@@ -166,6 +160,7 @@ if _choice_ == "s":
     save_dict(idx_to_word, "langB.dat")
 
     centers = np.linspace(-1, 1, len(word_to_idx))
+    centers = quantize(centers, Qlevels)
     total_ngrams = len(vocab)
     current_progress = 0
     print_progress_bar(current_progress, total_ngrams, prefix='AutoGen:', suffix='Complete', length=50)
@@ -187,7 +182,7 @@ if _choice_ == "l":
     idx_to_word = load_dict("langB.dat")
     ngram_encoding_index = load_dict("model.dat")
     centers = np.linspace(-1, 1, len(word_to_idx))
-
+    
 mind_aspects = [
     "Attention",
     "Memory",
@@ -241,105 +236,25 @@ mind_aspects = [
     "Cognitive Flexibility",
     "Mental Imagery"
 ]
-semantic_goals = [
-    "Strategic Planning",
-    "Task Prioritization",
-    "Problem Solving",
-    "Resource Management",
-    "Cognitive Flexibility",
-    "Impulse Control",
-    "Working Memory",
-    "Decision-Making",
-    "Goal Setting",
-    "Self-Monitoring",
-    "Attention Management",
-    "Error Detection and Correction",
-    "Emotional Regulation",
-    "Information Integration",
-    "Long-term Planning",
-    "Risk Assessment",
-    "Behavioral Inhibition",
-    "Reflection and Insight",
-    "Adaptability",
-    "Motivational Regulation",
-    "Self-Discipline",
-    "Time Management",
-    "Organizational Skills",
-    "Critical Thinking",
-    "Creative Thinking",
-    "Detail Orientation",
-    "Self-Evaluation",
-    "Stress Management",
-    "Delegation",
-    "Prior Knowledge Activation",
-    "Conceptual Thinking",
-    "Learning from Experience",
-    "Perspective Taking",
-    "Judgment",
-    "Conflict Resolution",
-    "Negotiation",
-    "Effective Communication",
-    "Leadership",
-    "Empathy",
-    "Goal Adjustment",
-    "Habit Formation",
-    "Energy Management",
-    "Metacognition",
-    "Analytical Thinking",
-    "Synthesis of Ideas",
-    "Contextual Understanding",
-    "Innovation",
-    "Collaboration",
-    "Self-Motivation",
-    "Perseverance"
-]
-
-
-
 
 
 while True:
     aspects = []
-    encountered_texts = []  # Placeholder for environment
     mental_state = []
-    simulation = []
     user_input = filter_text(input("You: "))
 
-    for aspect in semantic_goals:
-        X = encode_sentence(chat(ngram_encoding_index, user_input.lower(), word_to_idx, generate_length, n), word_to_idx, centers, sigma, n)
-        Y = encode_sentence(chat(ngram_encoding_index, aspect.lower(), word_to_idx, generate_length, n), word_to_idx, centers, sigma, n)
-        simulation.append(cosine_similarity(X, Y))
+    response_begin = chat(ngram_encoding_index, user_input, word_to_idx, generate_length, n)
 
-    max_simulation = max(simulation)
-    if max_simulation >= agency_threshold:
-        instruction = np.argmax(simulation)
-
-        for i in range(agency_attempts):
-            response_check = chat(ngram_encoding_index, semantic_goals[instruction].lower(), word_to_idx, generate_length, n)
-
-            response_begin = chat(ngram_encoding_index, user_input, word_to_idx, generate_length, n)
-            X = encode_sentence(response_begin.lower(), word_to_idx, centers, sigma, n)
-            Y = encode_sentence(response_check.lower(), word_to_idx, centers, sigma, n)
-            if cosine_similarity(X, Y) > agent_quality:
-                print("Goal:", semantic_goals[instruction])
-                break
-    else:
-        aspects = []
-        mental_state = []
-
-        response_begin = chat(ngram_encoding_index, user_input, word_to_idx, generate_length, n)
-
-        for aspect in mind_aspects:
-            response = chat(ngram_encoding_index, aspect.lower(), word_to_idx, generate_length, n)
-            aspects.append(response) 
-        for i,aspect_unit in enumerate(aspects):
-            X = encode_sentence(response_begin, word_to_idx, centers, sigma, n)
-            Y = encode_sentence(aspect_unit, word_to_idx, centers, sigma, n)
-            mental_state.append(cosine_similarity(X, Y)) 
-        # Determine the aspect with the highest similarity
-        mode_index = np.argmax(mental_state)
-        if mode_index:
-            print("Mode:", mind_aspects[mode_index])
+    for aspect in mind_aspects:
+        response = chat(ngram_encoding_index, aspect.lower(), word_to_idx, generate_length, n)
+        aspects.append(response) 
+    for i,aspect_unit in enumerate(aspects):
+        X = encode_sentence(response_begin, word_to_idx, centers, sigma, n)
+        Y = encode_sentence(aspect_unit, word_to_idx, centers, sigma, n)
+        mental_state.append(cosine_similarity(X, Y)) 
+    mode_index = np.argmax(mental_state)
+    if mode_index:
+        print("Mode:", mind_aspects[mode_index])
             
     print(f"AI: {response_begin}")
     print()
