@@ -1,4 +1,4 @@
-# LLM v19.5 - entity
+# LLM v19.4 - entity
 
 import numpy as np
 import pickle
@@ -7,7 +7,6 @@ import re
 # Model parameters
 KB_memory_uncompressed = 1000 # KB access, -1 for unlimited
 generate_length = 25
-Qlevels = 1
 sigma = 0.7  # Width of the Gaussian functions
 padding_token = '<unk>'
 n = 3
@@ -22,13 +21,6 @@ def create_ngrams_and_words(text, max_n):
         ngrams = zip(*[words[i:] for i in range(n)])
         ngrams_and_words.extend([' '.join(ngram) for ngram in ngrams])
     return ngrams_and_words
-
-def quantize(values, num_levels):
-    min_val = np.min(values)
-    max_val = np.max(values)
-    levels = np.linspace(min_val, max_val, num_levels)
-    quantized = np.digitize(values, levels) - 1
-    return levels[quantized]
 
 def gaussian_rbf(x, c, s):
     return np.exp(-np.linalg.norm(x - c)**2 / (2 * s**2))
@@ -160,7 +152,6 @@ if _choice_ == "s":
     save_dict(idx_to_word, "langB.dat")
 
     centers = np.linspace(-1, 1, len(word_to_idx))
-    centers = quantize(centers, Qlevels)
     total_ngrams = len(vocab)
     current_progress = 0
     print_progress_bar(current_progress, total_ngrams, prefix='AutoGen:', suffix='Complete', length=50)
