@@ -1,4 +1,4 @@
-# LLM v19.2 - entity
+# LLM v19.3 - entity
 
 import numpy as np
 import pickle
@@ -25,8 +25,19 @@ def create_ngrams_and_words(text, max_n):
         ngrams_and_words.extend([' '.join(ngram) for ngram in ngrams])
     return ngrams_and_words
 
-def gaussian_rbf(x, c, s):
-    return np.exp(-np.linalg.norm(x - c)**2 / (2 * s**2))
+def quantize(values, num_levels):
+    """Quantize values to a limited number of levels."""
+    min_val = np.min(values)
+    max_val = np.max(values)
+    levels = np.linspace(min_val, max_val, num_levels)
+    quantized = np.digitize(values, levels) - 1
+    return levels[quantized]
+
+def gaussian_rbf(x, c, s, num_quantization_levels=10):
+    x_quantized = quantize(x, num_quantization_levels)
+    c_quantized = quantize(c, num_quantization_levels)
+    
+    return np.exp(-np.linalg.norm(x_quantized - c_quantized)**2 / (2 * s**2))
 
 def encode_ngram(ngram, token_vector, word_to_idx, centers, sigma):
     if ngram in word_to_idx:
