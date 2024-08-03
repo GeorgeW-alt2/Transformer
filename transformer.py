@@ -1,13 +1,13 @@
-# LLM v19.4 - entity
+# LLM v19.5 - entity
 
 import numpy as np
 import pickle
 import re
 
 # Model parameters
-KB_memory_uncompressed = 3000 # KB access, -1 for unlimited
+KB_memory_uncompressed = 1000 # KB access, -1 for unlimited
 generate_length = 25
-Qlevels = 1280
+Qlevels = 1
 sigma = 0.7  # Width of the Gaussian functions
 padding_token = '<unk>'
 n = 3
