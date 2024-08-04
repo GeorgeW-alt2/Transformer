@@ -1,4 +1,4 @@
-# LLM v19.4 - entity
+# LLM v19.7 - entity
 
 import numpy as np
 import pickle
@@ -33,6 +33,10 @@ def encode_ngram(ngram, token_vector, word_to_idx, centers, sigma):
         idx = word_to_idx[padding_token]
         return idx, gaussian_rbf(token_vector, centers[idx], sigma)
 
+def circumsum(arr):
+    cumsum = np.cumsum(arr)
+    return np.roll(cumsum, shift=-1)
+    
 def encode_sentence(sentence, word_to_idx, centers, sigma, max_n):
     encoded = np.zeros(len(word_to_idx))
     tokens = create_ngrams_and_words(sentence, max_n)
@@ -48,6 +52,7 @@ def encode_sentence(sentence, word_to_idx, centers, sigma, max_n):
         idx, rbf_value = encode_ngram(token, token_vector, word_to_idx, centers, sigma)
         encoded[idx] = rbf_value
 
+    encoded = circumsum(encoded)
     return encoded
 
 def cosine_similarity(vec1, vec2):
