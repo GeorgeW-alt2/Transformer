@@ -1,10 +1,10 @@
-# LLM v20.2
+# LLM v20.3
 import numpy as np
 import pickle
 import re
 
 # Model parameters
-KB_MEMORY_UNCOMPRESSED = -1
+KB_MEMORY_UNCOMPRESSED = 10000
 GENERATE_LENGTH = 25
 SIGMA = 0.7
 PADDING_TOKEN = '<unk>'
@@ -33,8 +33,7 @@ def encode_sentence(sentence, word_to_idx, centers, sigma, max_n):
     encoded = np.zeros(len(word_to_idx))
     for token in tokens:
         idx, rbf_value = encode_ngram(token, token_vector, word_to_idx, centers, sigma)
-        encoded[idx] = np.linalg.norm(idx) * np.linalg.norm(rbf_value)
-        encoded = np.linalg.norm(token_vector) * np.linalg.norm(rbf_value)
+        encoded += np.linalg.norm(token_vector*rbf_value) * np.linalg.norm(rbf_value*token)
 
     return encoded
 
