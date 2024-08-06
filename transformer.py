@@ -1,4 +1,4 @@
-# LLM v20.8
+# LLM v20.9
 import numpy as np
 import pickle
 import re
@@ -20,7 +20,7 @@ def create_ngrams_and_words(text, max_n):
 def gaussian_rbf(x, c, s,alpha):
     alpha += 1
 
-    return np.exp(-np.dot(-x, c)**2 / (2 * s**2))[alpha]
+    return np.exp(-np.dot(-x.reshape(1,-1), x.reshape(-1,1))**2 / (2 * s**2))[-alpha]
 
 def encode_ngram(ngram, token_vector, word_to_idx, centers, sigma, alpha):
     idx = word_to_idx.get(ngram, word_to_idx[PADDING_TOKEN])
