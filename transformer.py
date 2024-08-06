@@ -1,10 +1,10 @@
-# LLM v19.8 - entity
+# LLM v20 
 import numpy as np
 import pickle
 import re
 
 # Model parameters
-KB_MEMORY_UNCOMPRESSED = 1000
+KB_MEMORY_UNCOMPRESSED = -1
 GENERATE_LENGTH = 25
 SIGMA = 0.7
 PADDING_TOKEN = '<unk>'
@@ -25,9 +25,6 @@ def encode_ngram(ngram, token_vector, word_to_idx, centers, sigma):
     idx = word_to_idx.get(ngram, word_to_idx[PADDING_TOKEN])
     return idx, gaussian_rbf(token_vector, centers[idx], sigma)
 
-def circumsum(arr):
-    return np.roll(np.cumsum(arr), shift=-1)
-
 def encode_sentence(sentence, word_to_idx, centers, sigma, max_n):
     tokens = create_ngrams_and_words(sentence, max_n)
     token_vector = np.zeros(len(word_to_idx))
@@ -36,8 +33,8 @@ def encode_sentence(sentence, word_to_idx, centers, sigma, max_n):
     encoded = np.zeros(len(word_to_idx))
     for token in tokens:
         idx, rbf_value = encode_ngram(token, token_vector, word_to_idx, centers, sigma)
-        encoded[idx] = rbf_value
-    return circumsum(encoded)
+        encoded[idx] = np.linalg.norm(idx) * np.linalg.norm(rbf_value)
+    return encoded
 
 def cosine_similarity(vec1, vec2):
     dot_product = np.dot(vec1, vec2)
@@ -97,60 +94,7 @@ def print_progress_bar(iteration, total, prefix='', length=50, fill='█'):
     print(f'\r{prefix} |{bar}| {percent}% Complete', end='\r')
     if iteration == total:
         print()
-        
-mind_aspects = [
-    "Attention",
-    "Memory",
-    "Perception",
-    "Cognition",
-    "Consciousness",
-    "Emotion",
-    "Reasoning",
-    "Imagination",
-    "Learning",
-    "Intuition",
-    "Judgment",
-    "Awareness",
-    "Focus",
-    "Creativity",
-    "Problem-Solving",
-    "Decision-Making",
-    "Thinking",
-    "Planning",
-    "Language",
-    "Self-Control",
-    "Insight",
-    "Empathy",
-    "Mindfulness",
-    "Self-Awareness",
-    "Abstract Thinking",
-    "Critical Thinking",
-    "Analytical Thinking",
-    "Creative Thinking",
-    "Reflective Thinking",
-    "Spatial Thinking",
-    "Logical Thinking",
-    "Emotional Intelligence",
-    "Reasoning",
-    "Perceptual Thinking",
-    "Conceptual Thinking",
-    "Decision-Making",
-    "Problem-Solving",
-    "Meta-Cognition",
-    "Attention Span",
-    "Working Memory",
-    "Long-Term Memory",
-    "Short-Term Memory",
-    "Learning Styles",
-    "Cognitive Biases",
-    "Thinking Patterns",
-    "Motivation",
-    "Insightfulness",
-    "Self-Efficacy",
-    "Stress Management",
-    "Cognitive Flexibility",
-    "Mental Imagery"
-]
+     
 
 _choice_ = input("\nSave new model/Load old model?[s/l]:").lower()
 word_to_idx = idx_to_word = ngram_encoding_index = {}
@@ -186,11 +130,4 @@ if _choice_ == "l":
 while True:
     user_input = filter_text(input("You: "))
     response_begin = chat(ngram_encoding_index, user_input, word_to_idx, GENERATE_LENGTH, N)
-    aspects = [chat(ngram_encoding_index, aspect.lower(), word_to_idx, GENERATE_LENGTH, N) for aspect in mind_aspects]
-    mental_state = [cosine_similarity(encode_sentence(response_begin, word_to_idx, centers, SIGMA, N),
-                                      encode_sentence(aspect_unit, word_to_idx, centers, SIGMA, N))
-                    for aspect_unit in aspects]
-    mode_index = np.argmax(mental_state)
-    if mental_state:
-        print("Mode:", mind_aspects[mode_index])
     print(f"AI: {response_begin}\n")
