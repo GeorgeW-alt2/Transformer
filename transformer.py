@@ -1,12 +1,12 @@
-# LLM v20.3
+# LLM v20.4
 import numpy as np
 import pickle
 import re
 
 # Model parameters
-KB_MEMORY_UNCOMPRESSED = 10000
+KB_MEMORY_UNCOMPRESSED = 1000 # -1 for unlimited
 GENERATE_LENGTH = 25
-SIGMA = 0.7
+SIGMA = 0.3
 PADDING_TOKEN = '<unk>'
 N = 3
 
