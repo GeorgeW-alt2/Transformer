@@ -1,4 +1,4 @@
-# LLM v20.1
+# LLM v20.2
 import numpy as np
 import pickle
 import re
@@ -34,6 +34,8 @@ def encode_sentence(sentence, word_to_idx, centers, sigma, max_n):
     for token in tokens:
         idx, rbf_value = encode_ngram(token, token_vector, word_to_idx, centers, sigma)
         encoded[idx] = np.linalg.norm(idx) * np.linalg.norm(rbf_value)
+        encoded = np.linalg.norm(token_vector) * np.linalg.norm(rbf_value)
+
     return encoded
 
 def cosine_similarity(vec1, vec2):
@@ -183,11 +185,9 @@ if _choice_ == "l":
 while True:
     user_input = filter_text(input("You: "))
     response_begin = chat(ngram_encoding_index, user_input, word_to_idx, GENERATE_LENGTH, N)
-    aspects = [chat(ngram_encoding_index, aspect.lower(), word_to_idx, GENERATE_LENGTH, N) for aspect in mind_aspects]
-    mental_state = [cosine_similarity(encode_sentence(response_begin, word_to_idx, centers, SIGMA, N),
-                                      encode_sentence(aspect_unit, word_to_idx, centers, SIGMA, N))
-                    for aspect_unit in aspects]
-    mode_index = np.argmax(mental_state)
-    if mental_state:
-        print("Mode:", mind_aspects[mode_index])
+    #aspects = [chat(ngram_encoding_index, aspect.lower(), word_to_idx, GENERATE_LENGTH, N) for aspect in mind_aspects]
+    #mental_state = [cosine_similarity(encode_sentence(response_begin, word_to_idx, centers, SIGMA, N),encode_sentence(aspect_unit, word_to_idx, centers, SIGMA, N))for aspect_unit in aspects]
+    #mode_index = np.argmax(mental_state)
+    #if mental_state:
+    #    print("Mode:", mind_aspects[mode_index])
     print(f"AI: {response_begin}\n")
