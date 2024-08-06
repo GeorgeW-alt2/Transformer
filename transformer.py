@@ -1,10 +1,10 @@
-# LLM v30.2
+# LLM v30.3
 import numpy as np
 import pickle
 import re
 
 # Model parameters
-KB_MEMORY_UNCOMPRESSED = 100  # -1 for unlimited
+KB_MEMORY_UNCOMPRESSED = -1  # -1 for unlimited
 GENERATE_LENGTH = 50
 SIGMA = 0.7
 PADDING_TOKEN = '<unk>'
@@ -14,22 +14,18 @@ ALPHA = 0
 def filter_text(text):
     return re.sub(r'[^A-Za-z\s]', '', text)
 
-
 def create_ngrams_and_words(text, max_n):
     words = text.split()
     return [' '.join(ngram) for n in range(1, max_n + 1)
             for ngram in zip(*[words[i:] for i in range(n)])]
 
-
 def gaussian_rbf(x, c, s, alpha):
     alpha += 1
     return np.exp(-np.dot(-x.reshape(1, -1), x.reshape(-1, 1)) ** 2 / (2 * s ** 2))[-alpha]
 
-
 def encode_ngram(ngram, token_vector, word_to_idx, centers, sigma, alpha):
     idx = word_to_idx.get(ngram, word_to_idx[PADDING_TOKEN])
     return idx, gaussian_rbf(token_vector, centers[idx], sigma, alpha)
-
 
 def encode_sentence(sentence, word_to_idx, centers, sigma, max_n):
     tokens = create_ngrams_and_words(sentence, max_n)
@@ -43,17 +39,14 @@ def encode_sentence(sentence, word_to_idx, centers, sigma, max_n):
 
     return encoded
 
-
 def cosine_similarity(vec1, vec2):
     dot_product = np.dot(vec1, vec2)
     magnitude = np.linalg.norm(vec1) * np.linalg.norm(vec2)
     return dot_product / magnitude if magnitude != 0 else 0
 
-
 def softmax(logits):
     exps = np.exp(logits - np.max(logits))
     return exps / np.sum(exps)
-
 
 def text_to_vector(text, word_to_idx):
     vector = np.zeros(len(word_to_idx))
@@ -61,7 +54,6 @@ def text_to_vector(text, word_to_idx):
     for token in tokens:
         vector[word_to_idx.get(token, word_to_idx[PADDING_TOKEN])] = 1
     return vector
-
 
 def chat(ngram_encoding_index, question, word_to_idx, generate_length, n):
     input_vector = text_to_vector(question, word_to_idx)
@@ -84,12 +76,10 @@ def chat(ngram_encoding_index, question, word_to_idx, generate_length, n):
                 encoded[idx] = rbf_value
     return ' '.join(output)
 
-
 def save_dict(dictionary, filename):
     with open(filename, 'wb') as f:
         pickle.dump(dictionary, f)
     print(f"Dictionary saved to {filename}")
-
 
 def load_dict(filename):
     with open(filename, 'rb') as f:
@@ -97,10 +87,8 @@ def load_dict(filename):
     print(f"Dictionary loaded from {filename}")
     return dictionary
 
-
 def remove_sentences_with_numbers_and_symbols(sentences):
     return [s for s in sentences if re.match(r'^[A-Za-z\s,.]+$', s)]
-
 
 def print_progress_bar(iteration, total, prefix='', length=50, fill='█'):
     percent = "{:.1f}".format(100 * (iteration / float(total)))
@@ -109,7 +97,6 @@ def print_progress_bar(iteration, total, prefix='', length=50, fill='█'):
     print(f'\r{prefix} |{bar}| {percent}% Complete', end='\r')
     if iteration == total:
         print()
-
 
 _choice_ = input("\nSave new model/Load old model? [s/l]: ").lower()
 word_to_idx = idx_to_word = ngram_encoding_index = {}
