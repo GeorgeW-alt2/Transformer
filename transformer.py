@@ -1,13 +1,13 @@
-# LLM v20.9
+# LLM v30.0
 import numpy as np
 import pickle
 import re
 # Model parameters
-KB_MEMORY_UNCOMPRESSED = -1 # -1 for unlimited
+KB_MEMORY_UNCOMPRESSED = 1000 # -1 for unlimited
 GENERATE_LENGTH = 25
 SIGMA = 0.7
 PADDING_TOKEN = '<unk>'
-N = 3
+
 
 def filter_text(text):
     return re.sub(r'[^A-Za-z\s]', '', text)
@@ -156,6 +156,7 @@ _choice_ = input("\nSave new model/Load old model?[s/l]:").lower()
 word_to_idx = idx_to_word = ngram_encoding_index = {}
 
 if _choice_ == "s":
+    N = 3
     with open("test.txt", encoding="UTF-8") as f:
         conversations = remove_sentences_with_numbers_and_symbols(f.read().lower().split(".")[:KB_MEMORY_UNCOMPRESSED])
     vocab = set(ngram for conv in conversations for ngram in create_ngrams_and_words(conv + ".", N))
@@ -182,7 +183,7 @@ if _choice_ == "l":
     idx_to_word = load_dict("langB.dat")
     ngram_encoding_index = load_dict("model.dat")
     centers = np.linspace(-1, 1, len(word_to_idx))
-
+N = 2
 while True:
 
     user_input = filter_text(input("You: "))
