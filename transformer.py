@@ -1,10 +1,10 @@
-# LLM v30.0
+# LLM v30.1
 import numpy as np
 import pickle
 import re
 # Model parameters
-KB_MEMORY_UNCOMPRESSED = 1000 # -1 for unlimited
-GENERATE_LENGTH = 25
+KB_MEMORY_UNCOMPRESSED = -1 # -1 for unlimited
+GENERATE_LENGTH = 50
 SIGMA = 0.7
 PADDING_TOKEN = '<unk>'
 
@@ -97,59 +97,6 @@ def print_progress_bar(iteration, total, prefix='', length=50, fill='█'):
     if iteration == total:
         print()
      
-mind_aspects = [
-    "Attention",
-    "Memory",
-    "Perception",
-    "Cognition",
-    "Consciousness",
-    "Emotion",
-    "Reasoning",
-    "Imagination",
-    "Learning",
-    "Intuition",
-    "Judgment",
-    "Awareness",
-    "Focus",
-    "Creativity",
-    "Problem-Solving",
-    "Decision-Making",
-    "Thinking",
-    "Planning",
-    "Language",
-    "Self-Control",
-    "Insight",
-    "Empathy",
-    "Mindfulness",
-    "Self-Awareness",
-    "Abstract Thinking",
-    "Critical Thinking",
-    "Analytical Thinking",
-    "Creative Thinking",
-    "Reflective Thinking",
-    "Spatial Thinking",
-    "Logical Thinking",
-    "Emotional Intelligence",
-    "Reasoning",
-    "Perceptual Thinking",
-    "Conceptual Thinking",
-    "Decision-Making",
-    "Problem-Solving",
-    "Meta-Cognition",
-    "Attention Span",
-    "Working Memory",
-    "Long-Term Memory",
-    "Short-Term Memory",
-    "Learning Styles",
-    "Cognitive Biases",
-    "Thinking Patterns",
-    "Motivation",
-    "Insightfulness",
-    "Self-Efficacy",
-    "Stress Management",
-    "Cognitive Flexibility",
-    "Mental Imagery"
-]
 alpha = 0
 
 _choice_ = input("\nSave new model/Load old model?[s/l]:").lower()
@@ -188,11 +135,5 @@ while True:
 
     user_input = filter_text(input("You: "))
     response_begin = chat(ngram_encoding_index, user_input, word_to_idx, GENERATE_LENGTH, N)
-    aspects = [chat(ngram_encoding_index, aspect.lower(), word_to_idx, GENERATE_LENGTH, N) for aspect in mind_aspects]
-    mental_state = [cosine_similarity(encode_sentence(response_begin, word_to_idx, centers, SIGMA, N),
-                                      encode_sentence(aspect_unit, word_to_idx, centers, SIGMA, N))
-                    for aspect_unit in aspects]
-    mode_index = np.argmax(mental_state)
-    if mental_state:
-        print("Mode:", mind_aspects[mode_index])
+    
     print(f"AI: {response_begin}\n")
