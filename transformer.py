@@ -1,12 +1,11 @@
-# LLM v20.4
+# LLM v20.8
 import numpy as np
 import pickle
 import re
-
 # Model parameters
-KB_MEMORY_UNCOMPRESSED = 1000 # -1 for unlimited
+KB_MEMORY_UNCOMPRESSED = -1 # -1 for unlimited
 GENERATE_LENGTH = 25
-SIGMA = 0.3
+SIGMA = 0.7
 PADDING_TOKEN = '<unk>'
 N = 3
 
@@ -18,12 +17,14 @@ def create_ngrams_and_words(text, max_n):
     return [' '.join(ngram) for n in range(1, max_n + 1)
             for ngram in zip(*[words[i:] for i in range(n)])]
 
-def gaussian_rbf(x, c, s):
-    return np.exp(-np.linalg.norm(x - c)**2 / (2 * s**2))
+def gaussian_rbf(x, c, s,alpha):
+    alpha += 1
 
-def encode_ngram(ngram, token_vector, word_to_idx, centers, sigma):
+    return np.exp(-np.dot(-x, c)**2 / (2 * s**2))[alpha]
+
+def encode_ngram(ngram, token_vector, word_to_idx, centers, sigma, alpha):
     idx = word_to_idx.get(ngram, word_to_idx[PADDING_TOKEN])
-    return idx, gaussian_rbf(token_vector, centers[idx], sigma)
+    return idx, gaussian_rbf(token_vector, centers[idx], sigma, alpha)
 
 def encode_sentence(sentence, word_to_idx, centers, sigma, max_n):
     tokens = create_ngrams_and_words(sentence, max_n)
@@ -32,8 +33,8 @@ def encode_sentence(sentence, word_to_idx, centers, sigma, max_n):
         token_vector[word_to_idx.get(token, word_to_idx[PADDING_TOKEN])] = 1
     encoded = np.zeros(len(word_to_idx))
     for token in tokens:
-        idx, rbf_value = encode_ngram(token, token_vector, word_to_idx, centers, sigma)
-        encoded += np.linalg.norm(token_vector*rbf_value) * np.linalg.norm(rbf_value*token)
+        idx, rbf_value = encode_ngram(token, token_vector, word_to_idx, centers, sigma, alpha)
+        encoded[idx] = np.linalg.norm(idx) * np.linalg.norm(rbf_value)
 
     return encoded
 
@@ -149,6 +150,7 @@ mind_aspects = [
     "Cognitive Flexibility",
     "Mental Imagery"
 ]
+alpha = 0
 
 _choice_ = input("\nSave new model/Load old model?[s/l]:").lower()
 word_to_idx = idx_to_word = ngram_encoding_index = {}
@@ -169,7 +171,7 @@ if _choice_ == "s":
     for ngram in vocab:
         token_vector = np.zeros(len(word_to_idx))
         token_vector[word_to_idx.get(ngram, word_to_idx[PADDING_TOKEN])] = 1
-        idx, rbf_value = encode_ngram(ngram, token_vector, word_to_idx, centers, SIGMA)
+        idx, rbf_value = encode_ngram(ngram, token_vector, word_to_idx, centers, SIGMA, alpha)
         ngram_encoding_index[ngram] = (idx, rbf_value)
         current_progress += 1
         print_progress_bar(current_progress, total_ngrams, prefix='AutoGen:')
@@ -182,11 +184,14 @@ if _choice_ == "l":
     centers = np.linspace(-1, 1, len(word_to_idx))
 
 while True:
+
     user_input = filter_text(input("You: "))
     response_begin = chat(ngram_encoding_index, user_input, word_to_idx, GENERATE_LENGTH, N)
-    #aspects = [chat(ngram_encoding_index, aspect.lower(), word_to_idx, GENERATE_LENGTH, N) for aspect in mind_aspects]
-    #mental_state = [cosine_similarity(encode_sentence(response_begin, word_to_idx, centers, SIGMA, N),encode_sentence(aspect_unit, word_to_idx, centers, SIGMA, N))for aspect_unit in aspects]
-    #mode_index = np.argmax(mental_state)
-    #if mental_state:
-    #    print("Mode:", mind_aspects[mode_index])
+    aspects = [chat(ngram_encoding_index, aspect.lower(), word_to_idx, GENERATE_LENGTH, N) for aspect in mind_aspects]
+    mental_state = [cosine_similarity(encode_sentence(response_begin, word_to_idx, centers, SIGMA, N),
+                                      encode_sentence(aspect_unit, word_to_idx, centers, SIGMA, N))
+                    for aspect_unit in aspects]
+    mode_index = np.argmax(mental_state)
+    if mental_state:
+        print("Mode:", mind_aspects[mode_index])
     print(f"AI: {response_begin}\n")
