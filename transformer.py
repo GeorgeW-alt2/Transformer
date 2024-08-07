@@ -1,15 +1,14 @@
-# LLM v30.5
+# LLM v31.0
 import numpy as np
 import pickle
 import re
 
 # Model parameters
-KB_MEMORY_UNCOMPRESSED = 1000  # -1 for unlimited
+KB_MEMORY_UNCOMPRESSED = -1  # -1 for unlimited
 GENERATE_LENGTH = 50
-SIGMA = 0.7
+SPILL_FACTOR=0.1
 PADDING_TOKEN = '<unk>'
-ALPHA = 0
-
+N = 3
 
 def filter_text(text):
     return re.sub(r'[^A-Za-z\s]', '', text)
@@ -19,43 +18,39 @@ def create_ngrams_and_words(text, max_n):
     return [' '.join(ngram) for n in range(1, max_n + 1)
             for ngram in zip(*[words[i:] for i in range(n)])]
 
-def gaussian_rbf(x, c, s, alpha):
-    alpha += 1
-    return np.exp(-np.dot(-x.reshape(1, -1), x.reshape(-1, 1)) ** 2 / (2 * s ** 2))[-alpha]
-
-def encode_ngram(ngram, token_vector, word_to_idx, centers, sigma, alpha):
-    idx = word_to_idx.get(ngram, word_to_idx[PADDING_TOKEN])
-    return idx, gaussian_rbf(token_vector.T - np.max(token_vector), np.dot(centers[idx],token_vector) - np.max(token_vector), sigma, alpha)
-
 def encode_sentence(sentence, word_to_idx, centers, sigma, max_n):
     tokens = create_ngrams_and_words(sentence, max_n)
     token_vector = np.zeros(len(word_to_idx))
     for token in tokens:
         token_vector[word_to_idx.get(token, word_to_idx[PADDING_TOKEN])] = 1
-    encoded = np.zeros(len(word_to_idx))
-    for token in tokens:
-        idx, rbf_value = encode_ngram(token, token_vector, word_to_idx, centers, sigma, ALPHA)
-        encoded[idx] = np.linalg.norm(idx) * np.linalg.norm(rbf_value)
+    encoded = softmax(token_vector)
 
     return encoded
-
-def cosine_similarity(vec1, vec2):
-    dot_product = np.dot(vec1, vec2)
-    magnitude = np.linalg.norm(vec1) * np.linalg.norm(vec2) - np.max(dot_product)
-    return dot_product / magnitude if magnitude != 0 else 0
-
-def softmax(logits, spill_factor=0.1):
+    
+def softmax(logits):
+    exps = np.exp((logits - np.max(logits)))
+    return exps / np.sum(exps)
+    
+def softmax_with_gradients(logits):
     exps = np.exp(logits - np.max(logits))
     softmax_probs = exps / np.sum(exps)
     
-    # Spillover the probabilities to adjacent elements
+    # Spillover the probabilities with a gradient
     spilled_probs = np.zeros_like(softmax_probs)
     for i in range(len(softmax_probs)):
+        # Main probability with reduced spill factor
         spilled_probs[i] += softmax_probs[i] * (1 - spill_factor)
-        if i > 0:
-            spilled_probs[i - 1] += softmax_probs[i] * (spill_factor / 2)
-        if i < len(softmax_probs) - 1:
-            spilled_probs[i + 1] += softmax_probs[i] * (spill_factor / 2)
+        
+        # Gradient spill to adjacent elements
+        for j in range(1, len(softmax_probs)):
+            left_index = i+j
+            right_index = i - j
+            gradient_spill = SPILL_FACTOR / (j + 1)
+            
+            if left_index >= 0:
+                spilled_probs[left_index] += softmax_probs[i] * gradient_spill
+            if right_index < len(softmax_probs):
+                spilled_probs[right_index] += softmax_probs[i] * gradient_spill
     
     # Normalize the probabilities to make sure they sum up to 1
     spilled_probs /= np.sum(spilled_probs)
@@ -116,7 +111,6 @@ _choice_ = input("\nSave new model/Load old model? [s/l]: ").lower()
 word_to_idx = idx_to_word = ngram_encoding_index = {}
 
 if _choice_ == "s":
-    N = 3
     with open("test.txt", encoding="UTF-8") as f:
         conversations = remove_sentences_with_numbers_and_symbols(f.read().lower().split(".")[:KB_MEMORY_UNCOMPRESSED])
     vocab = list(set(ngram for conv in conversations for ngram in create_ngrams_and_words(conv + ".", N)))
@@ -126,25 +120,13 @@ if _choice_ == "s":
     save_dict(word_to_idx, "langA.dat")
     save_dict(idx_to_word, "langB.dat")
     centers = np.linspace(-1, 1, len(word_to_idx))
-    total_ngrams = len(vocab)
-    current_progress = 0
-    print_progress_bar(current_progress, total_ngrams, prefix='AutoGen:')
-    for ngram in vocab:
-        token_vector = np.zeros(len(word_to_idx))
-        token_vector[word_to_idx.get(ngram, word_to_idx[PADDING_TOKEN])] = 1
-        idx, rbf_value = encode_ngram(ngram, token_vector, word_to_idx, centers, SIGMA, ALPHA)
-        ngram_encoding_index[ngram] = (idx, rbf_value)
-        current_progress += 1
-        print_progress_bar(current_progress, total_ngrams, prefix='AutoGen:')
-    save_dict(ngram_encoding_index, "model.dat")
+    
 
 elif _choice_ == "l":
     word_to_idx = load_dict("langA.dat")
     idx_to_word = load_dict("langB.dat")
     ngram_encoding_index = load_dict("model.dat")
     centers = np.linspace(-1, 1, len(word_to_idx))
-
-N = 2
 while True:
     user_input = filter_text(input("You: "))
     response_begin = chat(ngram_encoding_index, user_input, word_to_idx, GENERATE_LENGTH, N)
