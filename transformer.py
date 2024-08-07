@@ -1,10 +1,10 @@
-# LLM v30.3
+# LLM v30.4
 import numpy as np
 import pickle
 import re
 
 # Model parameters
-KB_MEMORY_UNCOMPRESSED = -1  # -1 for unlimited
+KB_MEMORY_UNCOMPRESSED = 1000  # -1 for unlimited
 GENERATE_LENGTH = 50
 SIGMA = 0.7
 PADDING_TOKEN = '<unk>'
@@ -25,7 +25,7 @@ def gaussian_rbf(x, c, s, alpha):
 
 def encode_ngram(ngram, token_vector, word_to_idx, centers, sigma, alpha):
     idx = word_to_idx.get(ngram, word_to_idx[PADDING_TOKEN])
-    return idx, gaussian_rbf(token_vector, centers[idx], sigma, alpha)
+    return idx, gaussian_rbf(token_vector.T - np.max(token_vector), np.dot(centers[idx],token_vector) - np.max(token_vector), sigma, alpha)
 
 def encode_sentence(sentence, word_to_idx, centers, sigma, max_n):
     tokens = create_ngrams_and_words(sentence, max_n)
@@ -41,7 +41,7 @@ def encode_sentence(sentence, word_to_idx, centers, sigma, max_n):
 
 def cosine_similarity(vec1, vec2):
     dot_product = np.dot(vec1, vec2)
-    magnitude = np.linalg.norm(vec1) * np.linalg.norm(vec2)
+    magnitude = np.linalg.norm(vec1) * np.linalg.norm(vec2) - np.max(dot_product)
     return dot_product / magnitude if magnitude != 0 else 0
 
 def softmax(logits):
