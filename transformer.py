@@ -1,4 +1,4 @@
-# LLM v30.4
+# LLM v30.5
 import numpy as np
 import pickle
 import re
@@ -44,9 +44,23 @@ def cosine_similarity(vec1, vec2):
     magnitude = np.linalg.norm(vec1) * np.linalg.norm(vec2) - np.max(dot_product)
     return dot_product / magnitude if magnitude != 0 else 0
 
-def softmax(logits):
+def softmax(logits, spill_factor=0.1):
     exps = np.exp(logits - np.max(logits))
-    return exps / np.sum(exps)
+    softmax_probs = exps / np.sum(exps)
+    
+    # Spillover the probabilities to adjacent elements
+    spilled_probs = np.zeros_like(softmax_probs)
+    for i in range(len(softmax_probs)):
+        spilled_probs[i] += softmax_probs[i] * (1 - spill_factor)
+        if i > 0:
+            spilled_probs[i - 1] += softmax_probs[i] * (spill_factor / 2)
+        if i < len(softmax_probs) - 1:
+            spilled_probs[i + 1] += softmax_probs[i] * (spill_factor / 2)
+    
+    # Normalize the probabilities to make sure they sum up to 1
+    spilled_probs /= np.sum(spilled_probs)
+    
+    return spilled_probs
 
 def text_to_vector(text, word_to_idx):
     vector = np.zeros(len(word_to_idx))
