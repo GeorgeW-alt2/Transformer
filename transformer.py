@@ -1,4 +1,4 @@
-# LLM v32.0
+# LLM v33.0
 import numpy as np
 import pickle
 import re
@@ -41,12 +41,20 @@ def chat(question, word_to_idx, idx_to_word, generate_length, n):
 
     output = []
     for _ in range(generate_length):
-        probabilities = softmax(input_vectorB.flatten(),input_vector.flatten())
+        probabilities = softmax(input_vectorB.flatten(), input_vector.flatten())
         predicted_idx = np.random.choice(range(len(probabilities)), p=probabilities)
 
         ngram = idx_to_word.get(predicted_idx, PADDING_TOKEN)
         output.append(ngram)
         input_vector = text_to_vector(' '.join(output), word_to_idx)
+
+    # Backward chaining: refine the output in reverse
+    for i in range(len(output) - 1, 0, -1):
+        refined_input = ' '.join(output[:i])
+        input_vector = text_to_vector(refined_input, word_to_idx)
+        probabilities = softmax(input_vector.flatten())
+        chosen_idx = np.random.choice(range(len(probabilities)), p=probabilities)
+        output[i-2] = idx_to_word.get(chosen_idx, PADDING_TOKEN)
 
     return ' '.join(output)
 
